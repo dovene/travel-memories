@@ -1,0 +1,35 @@
+# Validation used by pull requests and called by both deployment workflows.
+# A failure here stops any deployment.
+name: Validate
+
+on:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Install, check, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Static checks
+        run: npm run check
+
+      - name: Tests
+        run: npm test
+
+      - name: Build validation (Wrangler dry run, both environments)
+        run: npm run build

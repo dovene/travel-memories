@@ -1,0 +1,58 @@
+# Travel Memories — Cloudflare Worker configuration
+#
+# One Worker serves the static frontend (public/) and the API (/api/*).
+# Three configurations:
+#   (top level)        local development via `npm run dev` (R2 is simulated locally)
+#   [env.staging]      deployed from the `develop` branch  -> travel-memories-staging
+#   [env.production]   deployed from the `main` branch     -> travel-memories-production
+#
+# Bindings and vars are NOT inherited by environments, so each env declares its own.
+# Runtime secrets (e.g. the admin password hash, session key) are set with
+# `wrangler secret put <NAME> --env <env>` and never committed.
+
+name = "travel-memories"
+main = "src/index.js"
+compatibility_date = "2026-10-15"
+workers_dev = true
+preview_urls = false
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+# Only API routes reach the Worker code; everything else is served as static assets.
+run_worker_first = ["/api/*"]
+
+[observability]
+enabled = true
+
+[vars]
+ENVIRONMENT = "development"
+PUBLIC_USERNAME = "dovene"
+
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "travel-memories-dev"
+
+# ---------------------------------------------------------------- staging
+[env.staging]
+name = "travel-memories-staging"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+PUBLIC_USERNAME = "dovene"
+
+[[env.staging.r2_buckets]]
+binding = "STORAGE"
+bucket_name = "travel-memories-staging"
+
+# ------------------------------------------------------------- production
+[env.production]
+name = "travel-memories-production"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+PUBLIC_USERNAME = "dovene"
+
+[[env.production.r2_buckets]]
+binding = "STORAGE"
+bucket_name = "travel-memories-production"
