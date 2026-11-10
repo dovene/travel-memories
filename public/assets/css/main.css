@@ -148,6 +148,11 @@ p {
   color: var(--white);
 }
 
+/* The `hidden` attribute must win over component display rules (e.g. .empty { display: grid }). */
+[hidden] {
+  display: none !important;
+}
+
 .sr-only {
   position: absolute !important;
   width: 1px;
