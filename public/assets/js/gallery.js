@@ -69,8 +69,16 @@
     return out;
   }
 
-  function placeHref(place) {
-    return "place.html?slug=" + encodeURIComponent(place.slug);
+  /*
+   * Link to a destination. `context` carries the homepage search/filter
+   * ({ query, country }) so the journey continues through the same list.
+   */
+  function placeHref(place, context) {
+    var p = new URLSearchParams();
+    p.set("slug", place.slug);
+    if (context && context.query) p.set("q", context.query);
+    if (context && context.country) p.set("country", context.country);
+    return "place.html?" + p.toString();
   }
 
   /* <img> markup for a photo/poster with lazy loading and responsive sources; "" when none. */
@@ -88,6 +96,8 @@
     return '<div class="no-cover" aria-hidden="true">' + TM.icons.compass + "</div>";
   }
 
+  var cardContext = null;
+
   function placeCard(place, index) {
     var c = TM.api.cover(place);
     var img = TM.api.coverImage(place, "thumb");
@@ -96,7 +106,7 @@
     var ratio = ratios[index % ratios.length];
     var name = pick(place.name);
     return (
-      '<a class="place-card reveal' + (img ? "" : " is-empty") + '" href="' + placeHref(place) + '" style="--ratio:' + ratio + '" aria-label="' + esc(t("card.open", { name: name })) + '">' +
+      '<a class="place-card reveal' + (img ? "" : " is-empty") + '" href="' + esc(placeHref(place, cardContext)) + '" style="--ratio:' + ratio + '" aria-label="' + esc(t("card.open", { name: name })) + '">' +
       '<div class="media' + (img ? " shimmer" : "") + '">' +
       (img ? imgTag(img, pick(c.altText), { eager: index < 3, sizes: "(max-width: 640px) 50vw, (max-width: 1100px) 50vw, 33vw" }) : noCover()) +
       "</div>" +
@@ -110,7 +120,8 @@
     );
   }
 
-  function renderPlaceCards(container, places) {
+  function renderPlaceCards(container, places, context) {
+    cardContext = context || null;
     container.innerHTML = places.map(placeCard).join("");
     wireLazy(container);
     reveal(container);

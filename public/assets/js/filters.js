@@ -53,5 +53,23 @@
     });
   }
 
-  TM.filters = { normalize: normalize, filterPlaces: filterPlaces, countries: countries };
+  /*
+   * The list a visitor scrolls through on the place page: the homepage list they came from
+   * (search and country filter included) in the same order, starting at the opened slug.
+   * If the slug is not part of the filtered list (e.g. a shared link), the full list is used.
+   * Returns { list, start } or null when the slug does not exist at all.
+   */
+  function journey(places, slug, criteria) {
+    criteria = criteria || {};
+    var active = Boolean(normalize(criteria.query) || criteria.country);
+    var filtered = active ? filterPlaces(places, criteria) : places;
+    var inFiltered = filtered.some(function (p) {
+      return p.slug === slug;
+    });
+    var list = inFiltered ? filtered : places;
+    for (var i = 0; i < list.length; i++) if (list[i].slug === slug) return { list: list, start: i, filtered: active && inFiltered };
+    return null;
+  }
+
+  TM.filters = { normalize: normalize, filterPlaces: filterPlaces, countries: countries, journey: journey };
 })();

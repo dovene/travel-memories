@@ -207,7 +207,7 @@
         empty.querySelector("p").textContent = state.query ? t("empty.text", { q: state.query }) : t("empty.textNoQuery");
       } else {
         empty.hidden = true;
-        TM.ui.renderPlaceCards(grid, results);
+        TM.ui.renderPlaceCards(grid, results, state);
       }
     }
 
@@ -279,49 +279,60 @@
     );
   }
 
-  /* ---------- Place detail ---------- */
+  /* ---------- Place pages: one continuous journey ----------
+   *
+   * The page opens on the requested destination and keeps adding the following ones as
+   * the visitor scrolls, in the order of the list they came from (homepage order, or their
+   * search/filter results). After the last one it loops back to the first.
+   * The address bar and tab title follow the destination in view; Back returns home.
+   */
   function initPlace() {
-    var slug = new URLSearchParams(location.search).get("slug") || "";
+    var params = new URLSearchParams(location.search);
+    var slug = params.get("slug") || "";
+    var criteria = { query: params.get("q") || "", country: params.get("country") || "" };
     var main = document.getElementById("place-root");
-    var current = null;
-    var nextPlace = null;
+    var journey = null; // { list, start, filtered }
+    var shown = 0; // how many sections have been added
+    var activeSlug = slug;
 
     main.innerHTML =
       '<section class="place-hero shimmer" style="background:var(--navy)"><div class="container place-hero-content"><p class="eyebrow" style="opacity:.6">' + esc(t("place.loading")) + "</p></div></section>";
 
-    function render() {
-      if (!current) {
-        main.innerHTML =
-          '<section class="section"><div class="container" style="padding-top:var(--header-h)"><div class="empty">' + TM.icons.compass +
-          "<h3>" + esc(t("place.notFoundTitle")) + "</h3><p>" + esc(t("place.notFoundText")) + '</p><a class="btn btn-primary" href="index.html#destinations">' + TM.icons.arrowLeft + esc(t("place.back")) + "</a></div></div></section>";
-        document.querySelector(".site-header").classList.add("is-solid");
-        return;
+    function homeHref() {
+      var p = new URLSearchParams();
+      if (journey && journey.filtered) {
+        if (criteria.query) p.set("q", criteria.query);
+        if (criteria.country) p.set("country", criteria.country);
       }
-      var p = current;
+      var qs = p.toString();
+      return "index.html" + (qs ? "?" + qs : "") + "#destinations";
+    }
+
+    function sectionHtml(p, n) {
       var c = TM.api.cover(p);
       var heroImg = TM.api.coverImage(p, "display");
-      var nextImg = nextPlace && TM.api.coverImage(nextPlace, "display");
       var photos = p.media.filter(function (m) {
         return m.type === "image";
       }).length;
       var videos = p.media.length - photos;
-      document.title = pick(p.name) + " — Travel Memories";
-
       var mediaCount = [];
       if (photos) mediaCount.push(photos === 1 ? t("card.photo") : t("card.photos", { n: photos }));
       if (videos) mediaCount.push(videos === 1 ? t("card.video") : t("card.videos", { n: videos }));
       if (!mediaCount.length) mediaCount.push(t("card.soon"));
+      var position = (journey.list.indexOf(p) + 1) + " / " + journey.list.length;
+      var Heading = n === 0 ? "h1" : "h2"; // one h1 per page; later destinations are h2
+      var id = "g-" + n;
 
-      main.innerHTML =
+      return (
         '<section class="place-hero' + (heroImg ? "" : " is-plain") + '">' +
         (heroImg
-          ? '<img alt="' + esc(pick(c.altText)) + '" fetchpriority="high" src="' + esc(heroImg.src) + '"' +
+          ? '<img alt="' + esc(pick(c.altText)) + '" ' + (n === 0 ? 'fetchpriority="high"' : 'loading="lazy"') + ' src="' + esc(heroImg.src) + '"' +
             (heroImg.srcset ? ' srcset="' + esc(heroImg.srcset) + '" sizes="100vw"' : "") + ">"
           : "") +
-        '<div class="container place-hero-content hero-enter">' +
-        '<a class="back-link" href="index.html#destinations">' + TM.icons.arrowLeft + esc(t("place.back")) + "</a>" +
-        '<p class="eyebrow">' + esc(p.city) + " · " + esc(pick(p.country)) + "</p>" +
-        "<h1>" + esc(pick(p.name)) + "</h1>" +
+        '<div class="container place-hero-content' + (n === 0 ? " hero-enter" : "") + '">' +
+        '<a class="back-link" href="' + esc(homeHref()) + '">' + TM.icons.arrowLeft + esc(t(journey.filtered ? "journey.backFiltered" : "place.back")) + "</a>" +
+        '<p class="eyebrow">' + esc(p.city) + " · " + esc(pick(p.country)) + '<span class="journey-pos">' + esc(position) + "</span></p>" +
+        "<" + Heading + ' class="place-title">' + esc(pick(p.name)) + "</" + Heading + ">" +
         "</div></section>" +
         '<div class="container">' +
         '<section class="place-intro">' +
@@ -332,40 +343,147 @@
         (p.visitedAt ? "<div><dt>" + esc(t("place.visited")) + "</dt><dd>" + esc(TM.i18n.formatMonth(p.visitedAt)) + "</dd></div>" : "") +
         "<div><dt>" + esc(t("place.media")) + "</dt><dd>" + esc(mediaCount.join(" · ")) + "</dd></div>" +
         "</dl></section>" +
-        '<section aria-labelledby="gallery-title">' +
-        '<div class="gallery-head"><h2 id="gallery-title">' + esc(t("place.gallery")) + "</h2>" +
+        '<section aria-labelledby="' + id + '">' +
+        '<div class="gallery-head"><h3 class="gallery-title" id="' + id + '">' + esc(t("place.gallery")) + "</h3>" +
         (p.media.length ? "<p>" + esc(t("place.galleryHint")) + "</p>" : "") + "</div>" +
         (p.media.length
-          ? '<div class="media-grid" id="media-grid"></div>'
-          : '<div class="empty" style="margin-bottom:var(--space-8)">' + TM.icons.camera + "<h3>" + esc(t("place.noMediaTitle")) + "</h3><p>" + esc(t("place.noMediaText")) + "</p></div>") +
-        "</section></div>" +
-        (nextPlace
-          ? '<a class="next-place" href="' + TM.ui.placeHref(nextPlace) + '">' +
-            (nextImg ? '<img alt="" loading="lazy" src="' + esc(nextImg.src) + '">' : "") +
-            '<div class="container"><div><p class="eyebrow">' + esc(t("place.next")) + "</p><h2>" + esc(pick(nextPlace.name)) + "</h2></div>" +
-            '<span class="btn btn-light">' + esc(t("place.nextCta")) + TM.icons.arrowRight + "</span></div></a>"
-          : "");
+          ? '<div class="media-grid"></div>'
+          : '<div class="empty journey-empty">' + TM.icons.camera + "<h3>" + esc(t("place.noMediaTitle")) + "</h3><p>" + esc(t("place.noMediaText")) + "</p></div>") +
+        "</section></div>"
+      );
+    }
 
-      if (p.media.length) {
-        TM.ui.renderMediaGrid(document.getElementById("media-grid"), p, function (i, el) {
+    function fillSection(article, p, n) {
+      article.innerHTML = sectionHtml(p, n);
+      var grid = article.querySelector(".media-grid");
+      if (grid) {
+        TM.ui.renderMediaGrid(grid, p, function (i, el) {
           TM.lightbox.open(p, i, el);
         });
       }
-      TM.ui.reveal(main);
+      TM.ui.wireLazy(article);
+      TM.ui.reveal(article);
     }
 
-    TM.i18n.onChange(render);
+    /* Adds the next destination (and, when wrapping around, a "back to the beginning" divider). */
+    function appendNext() {
+      var list = journey.list;
+      var index = (journey.start + shown) % list.length;
+      if (shown > 0 && list.length === 1) return false; // a single destination does not repeat
+      if (shown > 0 && index === 0 && list.length > 1) {
+        var divider = document.createElement("div");
+        divider.className = "journey-loop";
+        divider.innerHTML = TM.icons.compass + "<p>" + esc(t("journey.loop")) + "</p>";
+        main.insertBefore(divider, sentinel);
+      }
+      var p = list[index];
+      var article = document.createElement("article");
+      article.className = "journey-item";
+      article.setAttribute("data-slug", p.slug);
+      article.setAttribute("data-n", String(shown));
+      fillSection(article, p, shown);
+      main.insertBefore(article, sentinel);
+      sectionObserver.observe(article);
+      shown++;
+      return true;
+    }
 
-    // One request gives both this destination and the next one to suggest.
+    /* Address bar and tab title follow the destination crossing the middle of the screen. */
+    function setActive(article) {
+      var s = article.getAttribute("data-slug");
+      if (s === activeSlug) return;
+      activeSlug = s;
+      var p = journey.list.filter(function (x) {
+        return x.slug === s;
+      })[0];
+      var qs = new URLSearchParams();
+      qs.set("slug", s);
+      if (journey.filtered) {
+        if (criteria.query) qs.set("q", criteria.query);
+        if (criteria.country) qs.set("country", criteria.country);
+      }
+      history.replaceState(null, "", location.pathname + "?" + qs.toString());
+      document.title = pick(p.name) + " — Travel Memories";
+    }
+
+    var sectionObserver =
+      "IntersectionObserver" in window
+        ? new IntersectionObserver(
+            function (entries) {
+              entries.forEach(function (e) {
+                if (e.isIntersecting) setActive(e.target);
+              });
+            },
+            { rootMargin: "-50% 0px -50% 0px" }
+          )
+        : { observe: function () {} };
+
+    /* Invisible marker after the last section: when it gets close, the next destination is added. */
+    var sentinel = document.createElement("div");
+    sentinel.className = "journey-sentinel";
+    sentinel.setAttribute("aria-hidden", "true");
+    var loadMore =
+      "IntersectionObserver" in window
+        ? new IntersectionObserver(
+            function (entries) {
+              if (!entries[0].isIntersecting) return;
+              // Keep adding while the marker is still close (short destinations), a few at a time.
+              for (var k = 0; k < 3; k++) {
+                if (!appendNext()) break;
+                if (sentinel.getBoundingClientRect().top > window.innerHeight + 1200) break;
+              }
+            },
+            { rootMargin: "0px 0px 1200px 0px" }
+          )
+        : null;
+
+    /* Language change: rebuild every section's text, keeping the reader's place on screen. */
+    function relabel() {
+      var articles = main.querySelectorAll(".journey-item");
+      var anchor = null;
+      var offset = 0;
+      articles.forEach(function (a) {
+        var r = a.getBoundingClientRect();
+        if (!anchor && r.bottom > 0) {
+          anchor = a;
+          offset = r.top;
+        }
+      });
+      articles.forEach(function (a) {
+        var p = journey.list.filter(function (x) {
+          return x.slug === a.getAttribute("data-slug");
+        })[0];
+        fillSection(a, p, Number(a.getAttribute("data-n")));
+      });
+      main.querySelectorAll(".journey-loop p").forEach(function (el) {
+        el.textContent = t("journey.loop");
+      });
+      if (anchor) window.scrollBy(0, anchor.getBoundingClientRect().top - offset);
+      var current = journey.list.filter(function (x) {
+        return x.slug === activeSlug;
+      })[0];
+      if (current) document.title = pick(current.name) + " — Travel Memories";
+    }
+
+    function notFound() {
+      main.innerHTML =
+        '<section class="section"><div class="container" style="padding-top:var(--header-h)"><div class="empty">' + TM.icons.compass +
+        "<h3>" + esc(t("place.notFoundTitle")) + "</h3><p>" + esc(t("place.notFoundText")) + '</p><a class="btn btn-primary" href="index.html#destinations">' + TM.icons.arrowLeft + esc(t("place.back")) + "</a></div></div></section>";
+      document.querySelector(".site-header").classList.add("is-solid");
+    }
+
     TM.api
       .getPlaces()
-      .then(function (list) {
-        var i = list.findIndex(function (x) {
-          return x.slug === slug;
-        });
-        current = i === -1 ? null : list[i];
-        nextPlace = current && list.length > 1 ? list[(i + 1) % list.length] : null;
-        render();
+      .then(function (places) {
+        journey = TM.filters.journey(places, slug, criteria);
+        if (!journey) return notFound();
+        main.innerHTML = "";
+        main.appendChild(sentinel);
+        document.title = pick(journey.list[journey.start].name) + " — Travel Memories";
+        appendNext();
+        if (loadMore) loadMore.observe(sentinel);
+        else for (var i = 1; i < journey.list.length; i++) appendNext(); // old browsers: show the whole list once
+        TM.i18n.onChange(relabel);
       })
       .catch(function () {
         document.querySelector(".site-header").classList.add("is-solid");

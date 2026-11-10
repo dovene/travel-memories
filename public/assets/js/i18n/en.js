@@ -72,6 +72,8 @@ window.TM.locales.en = {
   "place.notFoundText": "It may have been moved or unpublished.",
   "place.loading": "Loading destination…",
 
+  "journey.loop": "Back to the beginning of the journey",
+  "journey.backFiltered": "Back to your results",
   "media.video": "Video",
   "media.play": "Play video: {alt}",
   "media.view": "View photo: {alt}",

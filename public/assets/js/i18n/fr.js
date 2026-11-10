@@ -72,6 +72,8 @@ window.TM.locales.fr = {
   "place.notFoundText": "Elle a peut-être été déplacée ou dépubliée.",
   "place.loading": "Chargement de la destination…",
 
+  "journey.loop": "Retour au début du voyage",
+  "journey.backFiltered": "Retour à vos résultats",
   "media.video": "Vidéo",
   "media.play": "Lire la vidéo : {alt}",
   "media.view": "Voir la photo : {alt}",

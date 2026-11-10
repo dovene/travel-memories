@@ -89,3 +89,23 @@ test("cover pictures fall back to a photo when the cover is a video without post
   assert.equal(api.image(photo, "display").src, "/m/p?variant=thumb", "missing display falls back to thumb");
   assert.equal(api.image({ id: "o", type: "image", url: "/m/o", variants: {} }, "display").src, "/m/o", "no previews → original");
 });
+
+test("the journey follows the list the visitor came from", () => {
+  const slugs = (r) => Array.from(r.list, (p) => p.slug);
+  const all = TM.filters.journey(places, "kyoto", {});
+  assert.equal(all.list[all.start].slug, "kyoto");
+  assert.deepEqual(slugs(all), Array.from(places, (p) => p.slug), "same order as the homepage");
+  assert.equal(all.filtered, false);
+
+  const italy = TM.filters.journey(places, "rome", { country: "IT" });
+  assert.deepEqual(slugs(italy), ["dolomites", "rome", "venice"]);
+  assert.equal(italy.start, 1);
+  assert.equal(italy.filtered, true);
+
+  const searched = TM.filters.journey(places, "venice", { query: "ven" });
+  assert.deepEqual(slugs(searched), ["venice"]);
+
+  const outside = TM.filters.journey(places, "kyoto", { country: "IT" });
+  assert.equal(outside.list.length, places.length, "a link outside the filter falls back to the full list");
+  assert.equal(TM.filters.journey(places, "atlantis", {}), null);
+});
