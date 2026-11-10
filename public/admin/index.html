@@ -30,8 +30,8 @@
         </div>
         <div class="actions">
           <a class="btn btn-sm hide-sm" id="view-live" href="../index.html" target="_blank" rel="noopener">View site</a>
-          <a class="btn btn-sm" href="login.html" id="logout">Sign out</a>
-          <span class="avatar" aria-hidden="true">D</span>
+          <a class="btn btn-sm" href="/admin/login" id="logout">Sign out</a>
+          <span class="avatar" id="avatar" aria-hidden="true"></span>
         </div>
       </div>
     </header>
@@ -50,7 +50,6 @@
             <h1 id="editor-title">New destination</h1>
           </div>
           <div style="display: flex; gap: var(--space-2)">
-            <a class="btn btn-ghost btn-sm" id="preview-link" href="#" target="_blank" rel="noopener">Preview</a>
             <button type="button" class="btn btn-danger btn-sm" id="delete-place">Delete</button>
           </div>
         </div>
@@ -71,25 +70,34 @@
             <div class="field" id="f-name">
               <label for="name">Name <span class="hint" id="name-hint"></span></label>
               <input class="input" id="name" maxlength="80" placeholder="e.g. Berlin" />
-              <span class="error">A name is required.</span>
+              <span class="error">A name in English is required.</span>
             </div>
 
             <div class="field">
-              <label for="description">Description <span class="hint"><span id="desc-count">0</span> / 400</span></label>
-              <textarea class="textarea" id="description" maxlength="400" placeholder="A few words about this place…"></textarea>
+              <label for="description">Description <span class="hint"><span id="desc-count">0</span> / 1000</span></label>
+              <textarea class="textarea" id="description" maxlength="1000" placeholder="A few words about this place…"></textarea>
+              <span class="error"></span>
             </div>
 
             <div class="form-row">
               <div class="field" id="f-city">
                 <label for="city">City</label>
-                <input class="input" id="city" placeholder="e.g. Berlin" />
+                <input class="input" id="city" maxlength="80" placeholder="e.g. Berlin" />
                 <span class="error">A city is required.</span>
               </div>
               <div class="field" id="f-country">
                 <label for="country">Country</label>
-                <input class="input" id="country" list="country-list" placeholder="e.g. Germany" />
+                <input class="input" id="country" list="country-list" autocomplete="off" placeholder="Start typing, e.g. Germany" />
                 <datalist id="country-list"></datalist>
-                <span class="error">A country is required.</span>
+                <span class="error">Choose a country from the list.</span>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="field" id="f-visited">
+                <label for="visited">Visited <span class="hint">optional</span></label>
+                <input class="input" id="visited" type="month" />
+                <span class="error"></span>
               </div>
             </div>
           </section>
@@ -105,9 +113,9 @@
 
             <div class="dropzone" id="dropzone">
               <span class="dz-icon" id="dz-icon"></span>
-              <strong>Drop photos and videos here</strong>
-              <p>or <u>browse your files</u> — JPG, PNG, WEBP, HEIC, MP4, MOV · up to 25 MB per photo, 500 MB per video</p>
-              <input type="file" id="file-input" multiple accept="image/jpeg,image/png,image/webp,image/heic,video/mp4,video/quicktime" aria-label="Upload photos and videos" />
+              <strong id="dz-title">Drop photos and videos here</strong>
+              <p id="dz-text">or <u>browse your files</u> — JPG, PNG, WEBP, HEIC, AVIF, MP4, MOV, WEBM · up to 25 MB per photo, 95 MB per video</p>
+              <input type="file" id="file-input" multiple accept="image/jpeg,image/png,image/webp,image/heic,image/avif,video/mp4,video/quicktime,video/webm,.heic,.heif" aria-label="Upload photos and videos" />
             </div>
 
             <div class="upload-list" id="upload-list" aria-live="polite"></div>
@@ -138,8 +146,6 @@
     <script src="../assets/js/icons.js"></script>
     <script src="../assets/js/i18n/en.js"></script>
     <script src="../assets/js/i18n.js"></script>
-    <script src="../assets/js/data/mock-content.js"></script>
-    <script src="../assets/js/api.js"></script>
     <script src="../assets/js/gallery.js"></script>
     <script src="../assets/js/admin.js"></script>
   </body>

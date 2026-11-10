@@ -6,6 +6,21 @@
  */
 import { createHash } from "node:crypto";
 
+/* Workers-only API used by uploads; a pass-through stream is enough under Node. */
+if (!globalThis.FixedLengthStream) {
+  globalThis.FixedLengthStream = class {
+    constructor() {
+      return new TransformStream();
+    }
+  };
+}
+
+async function readAll(stream) {
+  const chunks = [];
+  for await (const c of stream) chunks.push(c);
+  return new Uint8Array(Buffer.concat(chunks));
+}
+
 function toBytes(value) {
   if (typeof value === "string") return new TextEncoder().encode(value);
   if (value instanceof Uint8Array) return value;
@@ -61,7 +76,7 @@ export class FakeR2 {
     const c = options.onlyIf || {};
     if (c.etagMatches !== undefined && (!existing || existing.etag !== c.etagMatches)) return null;
     if (c.etagDoesNotMatch === "*" && existing) return null;
-    const bytes = toBytes(value);
+    const bytes = value instanceof ReadableStream ? await readAll(value) : toBytes(value);
     const etag = createHash("md5").update(bytes).update(String(Math.random())).digest("hex");
     const o = { bytes, etag, uploaded: new Date(), httpMetadata: options.httpMetadata || {} };
     this.objects.set(key, o);

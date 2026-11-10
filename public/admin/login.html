@@ -51,14 +51,11 @@
             <span class="error">Please enter your password.</span>
           </div>
 
-          <label class="check"><input type="checkbox" checked /> Keep me signed in on this device</label>
+          <p class="check">You stay signed in on this device for 7 days.</p>
 
           <button class="btn btn-primary btn-block" type="submit" id="login-btn">Sign in</button>
 
-          <p class="proto-note">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5M12 16.5v.01" /></svg>
-            <span>Design prototype — any username and password will open the editor. Nothing is sent or stored.</span>
-          </p>
+          <p class="form-error" id="login-error" role="alert" hidden></p>
 
           <a class="back-link" href="../index.html" style="color: var(--text-muted)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6" /></svg>
@@ -72,21 +69,51 @@
       (function () {
         var form = document.getElementById("login-form");
         var btn = document.getElementById("login-btn");
+        var errorBox = document.getElementById("login-error");
+
+        function showError(text) {
+          errorBox.textContent = text;
+          errorBox.hidden = !text;
+        }
+
         form.addEventListener("submit", function (e) {
           e.preventDefault();
+          showError("");
+          var username = document.getElementById("username").value.trim();
+          var password = document.getElementById("password").value;
           var ok = true;
-          [["username", "f-user"], ["password", "f-pass"]].forEach(function (pair) {
-            var empty = !document.getElementById(pair[0]).value.trim();
-            document.getElementById(pair[1]).classList.toggle("has-error", empty);
-            if (empty) ok = false;
+          [["f-user", username], ["f-pass", password]].forEach(function (pair) {
+            document.getElementById(pair[0]).classList.toggle("has-error", !pair[1]);
+            if (!pair[1]) ok = false;
           });
           if (!ok) return;
-          /* Prototype only: no credentials leave the page. */
+
           btn.classList.add("is-loading");
           btn.innerHTML = '<span class="spinner"></span> Signing in…';
-          setTimeout(function () {
-            location.href = "index.html";
-          }, 900);
+          fetch("/api/admin/login", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: username, password: password })
+          })
+            .then(function (res) {
+              if (res.ok) {
+                location.replace("/admin/");
+                return;
+              }
+              return res.json().catch(function () { return null; }).then(function (data) {
+                var message = data && data.error && data.error.message;
+                showError(message || "Sign-in failed. Please try again.");
+                document.getElementById("password").select();
+              });
+            })
+            .catch(function () {
+              showError("Network error — check your connection.");
+            })
+            .then(function () {
+              btn.classList.remove("is-loading");
+              btn.textContent = "Sign in";
+            });
         });
       })();
     </script>

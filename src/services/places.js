@@ -138,6 +138,84 @@ export async function updatePlace(store, ownerId, placeId, input, expectedVersio
   });
 }
 
+/* ---------- media ---------- */
+
+function touch(place) {
+  place.version += 1;
+  place.updatedAt = now();
+}
+
+function renumber(place) {
+  place.media.sort((a, b) => a.position - b.position).forEach((m, i) => (m.position = i));
+}
+
+/* Fails fast (before a large upload is read) when the place does not exist or is full. */
+export async function assertCanAddMedia(store, ownerId, placeId, max) {
+  const { data } = await store.getPlaces(ownerId);
+  const place = findPlace(data, placeId);
+  if (place.media.length >= max) throw new ApiError(409, "too_many_media", `A destination can hold at most ${max} photos and videos.`);
+}
+
+export async function addMedia(store, ownerId, placeId, media) {
+  return store.mutatePlaces(ownerId, (doc) => {
+    const place = findPlace(doc, placeId);
+    place.media.push({ ...media, position: place.media.length });
+    if (!place.coverMediaId) place.coverMediaId = media.id; // the first upload becomes the cover
+    touch(place);
+    return place;
+  });
+}
+
+export async function removeMedia(store, ownerId, placeId, mediaId) {
+  let removed;
+  const place = await store.mutatePlaces(ownerId, (doc) => {
+    const p = findPlace(doc, placeId);
+    removed = p.media.find((m) => m.id === mediaId);
+    if (!removed) throw new ApiError(404, "not_found", "Media not found.");
+    p.media = p.media.filter((m) => m.id !== mediaId);
+    renumber(p);
+    if (p.coverMediaId === mediaId) p.coverMediaId = p.media.length ? p.media[0].id : null;
+    touch(p);
+    return p;
+  });
+  // The file is deleted only once nothing references it.
+  await store.deleteMediaFile(ownerId, placeId, removed.filename);
+  return place;
+}
+
+export async function reorderMedia(store, ownerId, placeId, order) {
+  if (!Array.isArray(order) || order.some((id) => typeof id !== "string"))
+    throw new ApiError(422, "validation_failed", "Some fields are not valid.", [{ path: "/order", message: "must be a list of media ids" }]);
+  return store.mutatePlaces(ownerId, (doc) => {
+    const place = findPlace(doc, placeId);
+    const current = place.media.map((m) => m.id).sort();
+    const proposed = [...order].sort();
+    // The list must be exactly the current media: otherwise the editor is out of date.
+    if (current.length !== proposed.length || current.some((id, i) => id !== proposed[i])) {
+      throw new ApiError(409, "media_changed", "The media of this destination changed. Reload and try again.", {
+        currentOrder: [...place.media].sort((a, b) => a.position - b.position).map((m) => m.id),
+      });
+    }
+    const index = new Map(order.map((id, i) => [id, i]));
+    place.media.forEach((m) => (m.position = index.get(m.id)));
+    renumber(place);
+    touch(place);
+    return place;
+  });
+}
+
+export async function setCover(store, ownerId, placeId, mediaId) {
+  if (typeof mediaId !== "string")
+    throw new ApiError(422, "validation_failed", "Some fields are not valid.", [{ path: "/mediaId", message: "is required" }]);
+  return store.mutatePlaces(ownerId, (doc) => {
+    const place = findPlace(doc, placeId);
+    if (!place.media.some((m) => m.id === mediaId)) throw new ApiError(404, "not_found", "Media not found.");
+    place.coverMediaId = mediaId;
+    touch(place);
+    return place;
+  });
+}
+
 export async function deletePlace(store, ownerId, placeId, expectedVersion) {
   const removed = await store.mutatePlaces(ownerId, (doc) => {
     const place = findPlace(doc, placeId);

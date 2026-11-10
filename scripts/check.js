@@ -96,8 +96,13 @@ for (const name of ["staging", "production"]) {
   if (topBucket && topBucket === envs[name].bucket) fail(`Top-level R2 bucket "${topBucket}" collides with [env.${name}]`);
 }
 
-// The local-only admin sign-in (DEV_OWNER_ID) belongs in the git-ignored .dev.vars, never in deployed config.
-if (/DEV_OWNER_ID/.test(toml)) fail("wrangler.toml must not define DEV_OWNER_ID (local .dev.vars only)");
+// Secrets belong in Wrangler secrets / the git-ignored .dev.vars, never in the committed config.
+for (const name of ["ADMIN_PASSWORD_HASH", "SESSION_SECRET"]) {
+  if (new RegExp(`^\\s*${name}\\s*=`, "m").test(toml)) fail(`wrangler.toml must not define ${name} (use wrangler secret put)`);
+}
+for (const name of ["staging", "production"]) {
+  if (envs[name] && !/LOGIN_LIMITER/.test(section(name) || "")) fail(`[env.${name}] has no LOGIN_LIMITER rate limit`);
+}
 
 // Schemas must be valid JSON and only use keywords the runtime validator enforces.
 {

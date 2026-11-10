@@ -118,6 +118,12 @@ export class ContentStore {
     return this.bucket.get(keys.media(ownerId, placeId, filename), options);
   }
 
+  async deleteMediaFile(ownerId, placeId, filename) {
+    assertSegment(ownerId, "owner");
+    assertSegment(placeId, "place");
+    await this.bucket.delete(keys.media(ownerId, placeId, filename));
+  }
+
   /* Deletes every object under a place's media folder. */
   async deleteMediaFolder(ownerId, placeId) {
     assertSegment(ownerId, "owner");

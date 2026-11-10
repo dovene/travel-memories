@@ -85,6 +85,15 @@ body.admin {
   font-size: var(--fs-2xl);
 }
 
+.form-error {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  background: rgba(179, 65, 58, 0.08);
+  color: var(--danger);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
 .login-card .sub {
   color: var(--text-muted);
   margin-top: var(--space-2);
@@ -517,6 +526,16 @@ body.admin {
   color: var(--text-muted);
 }
 
+.dropzone.is-locked {
+  opacity: 0.6;
+  border-style: solid;
+  border-color: var(--border);
+}
+
+.dropzone.is-locked input[type="file"] {
+  display: none;
+}
+
 .dropzone input[type="file"] {
   position: absolute;
   inset: 0;
@@ -794,6 +813,23 @@ body.admin {
   font-size: 0.6875rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.mm-item .mm-fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--ocean);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-align: center;
+  padding: var(--space-3);
+}
+
+.mm-item.is-busy {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .mm-empty {

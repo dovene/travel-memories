@@ -17,7 +17,8 @@ function setup() {
   }
   const env = { ENVIRONMENT: "test", STORAGE: bucket };
   const call = (method, path, { owner, body, headers = {} } = {}) => {
-    const init = { method, headers: { ...headers } };
+    // Browsers send Origin on every POST/PUT/DELETE; tests do the same unless overridden.
+    const init = { method, headers: { ...(method === "GET" || method === "HEAD" ? {} : { Origin: ORIGIN }), ...headers } };
     if (owner) init.headers["X-Test-Owner"] = owner;
     if (body !== undefined) {
       init.body = typeof body === "string" ? body : JSON.stringify(body);
@@ -140,9 +141,14 @@ describe("admin API — authentication and input", () => {
     assert.equal((await call("POST", "/api/admin/places", { owner: "dovene", body: berlin, headers: { Origin: ORIGIN } })).status, 201);
   });
 
-  test("media management is not available yet", async () => {
+  test("state-changing requests without an Origin header are refused", async () => {
     const { call } = setup();
-    assert.equal((await call("PUT", "/api/admin/places/x/media/order", { owner: "dovene", body: {} })).status, 501);
+    const res = await handleApi(
+      new Request(ORIGIN + "/api/admin/places", { method: "POST", headers: { "X-Test-Owner": "dovene", "Content-Type": "application/json" }, body: JSON.stringify(berlin) }),
+      { STORAGE: new FakeR2() }, {}, testAuth
+    );
+    assert.equal(res.status, 403);
+    assert.equal((await call("GET", "/api/admin/places", { owner: "dovene" })).status, 200, "reads need no Origin");
   });
 });
 

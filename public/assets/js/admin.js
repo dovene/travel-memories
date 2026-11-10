@@ -1,7 +1,12 @@
 /*
- * Administration screen — visual prototype.
- * Everything happens in memory: no authentication, no network writes, no persistence.
- * Client-side checks here are UX only; the real Worker must validate everything server-side.
+ * Administration screen, connected to the Worker API.
+ *
+ * - Text fields (name, description, city, country, visit date) are edited locally and saved
+ *   with "Save & publish". Saves send the place version in If-Match, so an edit made from
+ *   another tab or device is never silently overwritten.
+ * - Media actions (upload, remove, reorder, cover) are applied immediately; each response
+ *   returns the updated place, which keeps the local version current.
+ * - File checks here only improve the experience; the server re-checks everything.
  */
 (function () {
   "use strict";
@@ -9,129 +14,176 @@
   var TM = window.TM;
   var I = TM.icons;
   var esc = TM.ui.esc;
+  var API = "/api/admin";
 
   var LIMITS = {
-    image: { types: ["image/jpeg", "image/png", "image/webp", "image/heic"], ext: ["jpg", "jpeg", "png", "webp", "heic"], max: 25 * 1024 * 1024 },
-    video: { types: ["video/mp4", "video/quicktime"], ext: ["mp4", "mov"], max: 500 * 1024 * 1024 }
+    image: { types: ["image/jpeg", "image/png", "image/webp", "image/heic", "image/avif"], ext: ["jpg", "jpeg", "png", "webp", "heic", "heif", "avif"], max: 25 * 1024 * 1024 },
+    video: { types: ["video/mp4", "video/quicktime", "video/webm"], ext: ["mp4", "m4v", "mov", "webm"], max: 95 * 1024 * 1024 }
   };
+  var EXT_TYPES = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", heic: "image/heic", heif: "image/heic", avif: "image/avif", mp4: "video/mp4", m4v: "video/mp4", mov: "video/quicktime", webm: "video/webm" };
 
-  var places = TM.api._placesSync();
-  var selectedId = null;
-  var draft = null;
+  /* ISO 3166-1 alpha-2 codes; names come from the browser in English and French. */
+  var COUNTRY_CODES = ("AD AE AF AG AI AL AM AO AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GT GU GW GY HK HN HR HT HU ID IE IL IM IN IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW").split(" ");
+  var regionNames = {};
+  function countryName(code, lang) {
+    try {
+      regionNames[lang] = regionNames[lang] || new Intl.DisplayNames([lang], { type: "region" });
+      return regionNames[lang].of(code) || code;
+    } catch (e) {
+      return code;
+    }
+  }
+  var COUNTRIES = COUNTRY_CODES.map(function (code) {
+    return { code: code, en: countryName(code, "en"), fr: countryName(code, "fr") };
+  }).sort(function (a, b) {
+    return a.en.localeCompare(b.en);
+  });
+  function findCountry(text) {
+    var t = String(text || "").trim().toLowerCase();
+    if (!t) return null;
+    return COUNTRIES.filter(function (c) {
+      return c.en.toLowerCase() === t || c.fr.toLowerCase() === t || c.code.toLowerCase() === t;
+    })[0] || null;
+  }
+
+  var places = [];
+  var current = null; // server copy of the selected place (null = new destination)
+  var draft = null;   // locally edited text fields
   var dirty = false;
   var tab = "en";
-  var newCounter = 0;
 
   var $ = function (id) {
     return document.getElementById(id);
   };
 
-  function clone(v) {
-    return JSON.parse(JSON.stringify(v));
+  /* ---------- API ---------- */
+  function ApiError(status, body) {
+    this.status = status;
+    this.code = body && body.error && body.error.code;
+    this.message = (body && body.error && body.error.message) || "Something went wrong.";
+    this.details = body && body.error && body.error.details;
   }
 
-  function blank() {
-    return {
-      id: "",
-      ownerId: "dovene",
-      slug: "",
-      name: { en: "", fr: "" },
-      description: { en: "", fr: "" },
-      city: "",
-      country: { en: "", fr: "" },
-      countryCode: "",
-      coverMediaId: null,
-      media: []
-    };
+  function request(method, path, body, headers) {
+    var init = { method: method, credentials: "same-origin", headers: headers || {} };
+    if (body !== undefined) {
+      init.body = JSON.stringify(body);
+      init.headers["Content-Type"] = "application/json";
+    }
+    return fetch(API + path, init).then(function (res) {
+      if (res.status === 401) {
+        location.href = "/admin/login";
+        throw new ApiError(401, null);
+      }
+      if (res.status === 204) return null;
+      return res.json().catch(function () {
+        return null;
+      }).then(function (data) {
+        if (!res.ok) throw new ApiError(res.status, data);
+        return data;
+      });
+    });
   }
 
-  function slugify(s) {
-    return String(s || "")
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "");
+  function failed(err) {
+    if (err && err.status === 401) return;
+    TM.ui.toast((err && err.message) || "Network error — check your connection.");
   }
 
+  /* ---------- helpers ---------- */
   function fmtSize(b) {
     if (b > 1024 * 1024) return (b / 1024 / 1024).toFixed(1) + " MB";
     return Math.max(1, Math.round(b / 1024)) + " KB";
   }
 
-  /* ---------- Dirty state ---------- */
   function setDirty(v) {
     dirty = v;
     var s = $("save-state");
     s.classList.toggle("is-dirty", v);
-    s.textContent = v ? "Unsaved changes" : "All changes saved";
+    s.textContent = v ? "Unsaved changes" : current ? "All changes saved" : "New destination — not saved yet";
   }
 
-  /* ---------- Sidebar ---------- */
+  function draftFrom(place) {
+    return {
+      name: { en: (place && place.name.en) || "", fr: (place && place.name.fr) || "" },
+      description: { en: (place && place.description && place.description.en) || "", fr: (place && place.description && place.description.fr) || "" },
+      city: (place && place.city) || "",
+      countryCode: (place && place.countryCode) || "",
+      countryText: place ? (findCountry(place.countryCode) || { en: place.country.en }).en : "",
+      visitedAt: (place && place.visitedAt) || ""
+    };
+  }
+
+  function replacePlace(place) {
+    var i = places.findIndex(function (p) {
+      return p.id === place.id;
+    });
+    if (i === -1) places.unshift(place);
+    else places[i] = place;
+    if (current && current.id === place.id) current = place;
+  }
+
+  function coverOf(place) {
+    return place.media.filter(function (m) {
+      return m.id === place.coverMediaId;
+    })[0];
+  }
+
+  /* ---------- sidebar ---------- */
   function renderList() {
-    $("dest-list").innerHTML = places
-      .map(function (p) {
-        var c = TM.api.cover(p);
-        var thumb = c && c.type === "image" ? '<img alt="" src="' + esc(TM.api.mediaUrl(c, 120, 120)) + '">' : '<span class="ph">' + I.image + "</span>";
-        return (
-          '<li><button type="button" class="dest-item" data-id="' + esc(p.id) + '" aria-current="' + (p.id === selectedId) + '">' +
-          thumb +
-          "<div><strong>" + esc(p.name.en || "Untitled") + "</strong><span>" + esc(p.city) + " · " + p.media.length + " items</span></div>" +
-          '<span class="status-dot" title="Published"></span>' +
-          "</button></li>"
-        );
-      })
-      .join("");
-    var countries = {};
-    places.forEach(function (p) {
-      countries[p.country.en] = 1;
-    });
-    $("country-list").innerHTML = Object.keys(countries)
-      .sort()
-      .map(function (c) {
-        return '<option value="' + esc(c) + '">';
-      })
-      .join("");
+    $("dest-list").innerHTML = places.length
+      ? places
+          .map(function (p) {
+            var c = coverOf(p);
+            var thumb = c && c.type === "image" ? '<img alt="" loading="lazy" src="' + esc(c.url) + '">' : '<span class="ph">' + (c ? I.video : I.image) + "</span>";
+            return (
+              '<li><button type="button" class="dest-item" data-id="' + esc(p.id) + '" aria-current="' + Boolean(current && p.id === current.id) + '">' +
+              thumb +
+              "<div><strong>" + esc(p.name.en) + "</strong><span>" + esc(p.city) + " · " + p.media.length + " item" + (p.media.length === 1 ? "" : "s") + "</span></div>" +
+              '<span class="status-dot" title="Published"></span></button></li>'
+            );
+          })
+          .join("")
+      : '<li class="mm-empty" style="padding:var(--space-4)">No destinations yet. Create your first one.</li>';
   }
 
-  /* ---------- Editor ---------- */
+  /* ---------- editor ---------- */
+  function clearErrors() {
+    document.querySelectorAll(".field.has-error").forEach(function (f) {
+      f.classList.remove("has-error");
+    });
+  }
+
   function load(place) {
-    selectedId = place ? place.id : null;
-    draft = place ? clone(place) : blank();
+    current = place;
+    draft = draftFrom(place);
     tab = "en";
-    setDirty(false);
+    clearErrors();
     $("upload-list").innerHTML = "";
-    ["f-name", "f-city", "f-country"].forEach(function (id) {
-      $(id).classList.remove("has-error");
-    });
-    renderEditor();
-    renderList();
-    closeSide();
-  }
-
-  function renderEditor() {
-    var title = draft.name.en || "New destination";
+    var title = place ? place.name.en : "New destination";
     $("editor-title").textContent = title;
     $("crumb-name").textContent = title;
-    $("delete-place").hidden = !selectedId;
-    $("preview-link").hidden = !selectedId;
-    if (selectedId) $("preview-link").href = "../place.html?slug=" + encodeURIComponent(draft.slug);
-    renderTabs();
+    $("delete-place").hidden = !place;
     $("city").value = draft.city;
-    $("country").value = draft.country.en;
+    $("country").value = draft.countryText;
+    $("visited").value = /^\d{4}-\d{2}$/.test(draft.visitedAt) ? draft.visitedAt : "";
+    renderTabs();
     renderMedia();
+    renderList();
+    setDirty(false);
+    closeSide();
   }
 
   function renderTabs() {
     document.querySelectorAll("[data-tab]").forEach(function (b) {
       b.setAttribute("aria-selected", String(b.getAttribute("data-tab") === tab));
     });
-    $("name").value = draft.name[tab] || "";
-    $("description").value = draft.description[tab] || "";
+    $("name").value = draft.name[tab];
+    $("description").value = draft.description[tab];
     $("name").placeholder = tab === "fr" ? draft.name.en || "Nom en français" : "e.g. Berlin";
     $("description").placeholder = tab === "fr" ? "Laisser vide pour utiliser la version anglaise…" : "A few words about this place…";
     $("name-hint").textContent = tab === "fr" ? "falls back to English if empty" : "";
-    $("desc-count").textContent = ($("description").value || "").length;
+    $("desc-count").textContent = draft.description[tab].length;
   }
 
   function bindForm() {
@@ -145,7 +197,6 @@
       draft.name[tab] = e.target.value;
       if (tab === "en") {
         $("editor-title").textContent = e.target.value || "New destination";
-        $("crumb-name").textContent = e.target.value || "New destination";
         $("f-name").classList.remove("has-error");
       }
       setDirty(true);
@@ -161,68 +212,200 @@
       setDirty(true);
     });
     $("country").addEventListener("input", function (e) {
-      draft.country.en = e.target.value;
-      var match = places.filter(function (p) {
-        return p.country.en.toLowerCase() === e.target.value.trim().toLowerCase();
-      })[0];
-      draft.country.fr = match ? match.country.fr : "";
-      draft.countryCode = match ? match.countryCode : "";
-      $("f-country").classList.remove("has-error");
+      draft.countryText = e.target.value;
+      var match = findCountry(e.target.value);
+      draft.countryCode = match ? match.code : "";
+      if (match) $("f-country").classList.remove("has-error");
       setDirty(true);
+    });
+    $("visited").addEventListener("input", function (e) {
+      draft.visitedAt = e.target.value;
+      setDirty(true);
+    });
+    $("country-list").innerHTML = COUNTRIES.map(function (c) {
+      return '<option value="' + esc(c.en) + '">' + esc(c.fr !== c.en ? c.fr : "") + "</option>";
+    }).join("");
+  }
+
+  function payload() {
+    var country = findCountry(draft.countryText);
+    var body = {
+      name: { en: draft.name.en.trim(), fr: draft.name.fr.trim() },
+      description: { en: draft.description.en.trim(), fr: draft.description.fr.trim() },
+      city: draft.city.trim(),
+      visitedAt: draft.visitedAt || ""
+    };
+    if (country) {
+      body.countryCode = country.code;
+      body.country = { en: country.en, fr: country.fr };
+    }
+    if (!current && !body.visitedAt) delete body.visitedAt;
+    return body;
+  }
+
+  function validateLocally() {
+    clearErrors();
+    var bad = [];
+    if (!draft.name.en.trim()) bad.push("f-name");
+    if (!draft.city.trim()) bad.push("f-city");
+    if (!findCountry(draft.countryText)) bad.push("f-country");
+    bad.forEach(function (id) {
+      $(id).classList.add("has-error");
+    });
+    if (bad.length) {
+      tab = "en";
+      renderTabs();
+      var first = document.querySelector(".field.has-error .input");
+      if (first) first.focus();
+    }
+    return !bad.length;
+  }
+
+  /* Maps server validation paths (e.g. "/name/en") onto form fields. */
+  function showServerErrors(details) {
+    var map = { name: "f-name", city: "f-city", country: "f-country", countryCode: "f-country", visitedAt: "f-visited" };
+    (details || []).forEach(function (d) {
+      var key = String(d.path || "").split("/")[1];
+      var field = map[key] && $(map[key]);
+      if (field) {
+        field.classList.add("has-error");
+        var msg = field.querySelector(".error");
+        if (msg && key !== "name" && key !== "country" && key !== "countryCode") msg.textContent = key + " " + d.message;
+      }
     });
   }
 
-  /* ---------- Media manager ---------- */
+  function save() {
+    if (!validateLocally()) return;
+    var btn = $("save");
+    btn.classList.add("is-loading");
+    btn.innerHTML = '<span class="spinner"></span> Saving…';
+    var op = current
+      ? request("PUT", "/places/" + encodeURIComponent(current.id), payload(), { "If-Match": '"' + current.version + '"' })
+      : request("POST", "/places", payload());
+    op.then(function (place) {
+      replacePlace(place);
+      load(place);
+      TM.ui.toast("“" + place.name.en + "” saved");
+    })
+      .catch(function (err) {
+        if (err.status === 412) {
+          if (window.confirm("This destination was changed in another tab or device. Load the latest version? (Your unsaved text edits will be lost.)")) reloadCurrent();
+          return;
+        }
+        if (err.status === 422) showServerErrors(err.details);
+        failed(err);
+      })
+      .then(function () {
+        btn.classList.remove("is-loading");
+        btn.innerHTML = "Save &amp; publish";
+      });
+  }
+
+  function reloadCurrent() {
+    if (!current) return;
+    request("GET", "/places/" + encodeURIComponent(current.id))
+      .then(function (place) {
+        replacePlace(place);
+        load(place);
+      })
+      .catch(failed);
+  }
+
+  /* ---------- media ---------- */
   function renderMedia() {
     var box = $("media-manager");
-    var n = draft.media.length;
-    var photos = draft.media.filter(function (m) {
+    var locked = !current;
+    $("dropzone").classList.toggle("is-locked", locked);
+    $("dz-title").textContent = locked ? "Save the details first" : "Drop photos and videos here";
+    $("dz-text").innerHTML = locked
+      ? "Photos and videos can be added once the destination exists."
+      : "or <u>browse your files</u> — JPG, PNG, WEBP, HEIC, AVIF, MP4, MOV, WEBM · up to 25 MB per photo, 95 MB per video";
+
+    var media = current ? current.media.slice().sort(function (a, b) {
+      return a.position - b.position;
+    }) : [];
+    var photos = media.filter(function (m) {
       return m.type === "image";
     }).length;
-    $("media-count").textContent = photos + " photo" + (photos === 1 ? "" : "s") + " · " + (n - photos) + " video" + (n - photos === 1 ? "" : "s");
-    if (!n) {
-      box.innerHTML = '<p class="mm-empty">No media yet. Add a few photos or videos above — the first one becomes the cover.</p>';
+    $("media-count").textContent = photos + " photo" + (photos === 1 ? "" : "s") + " · " + (media.length - photos) + " video" + (media.length - photos === 1 ? "" : "s");
+
+    if (!media.length) {
+      box.innerHTML = locked ? "" : '<p class="mm-empty">No media yet. Add a few photos or videos above — the first one becomes the cover.</p>';
       return;
     }
-    box.innerHTML = draft.media
+    var n = media.length;
+    box.innerHTML = media
       .map(function (m, i) {
-        var isCover = m.id === draft.coverMediaId;
+        var isCover = m.id === current.coverMediaId;
+        var name = TM.i18n.pick(m.altText) || m.originalFilename || "Media " + (i + 1);
         var visual =
           m.type === "video"
-            ? '<video muted playsinline preload="metadata" src="' + esc(TM.api.mediaUrl(m)) + '#t=0.5"></video>'
-            : '<img alt="" loading="lazy" src="' + esc(TM.api.mediaUrl(m, 400, 400)) + '">';
-        var name = TM.i18n.pick(m.altText) || "Media " + (i + 1);
+            ? '<video muted playsinline preload="metadata" src="' + esc(m.url) + '#t=0.5"></video>'
+            : '<img alt="" loading="lazy" decoding="async" src="' + esc(m.url) + '">';
         return (
-          '<div class="mm-item' + (isCover ? " is-cover" : "") + (m.isNew ? " is-new" : "") + '" data-id="' + esc(m.id) + '">' +
+          '<div class="mm-item' + (isCover ? " is-cover" : "") + '" data-id="' + esc(m.id) + '">' +
           visual +
           '<div class="mm-top">' +
-          '<button type="button" class="mm-handle" aria-label="Reorder ' + esc(name) + ' (position ' + (i + 1) + " of " + n + '). Use arrow keys to move.">' + I.grip + "</button>" +
+          '<button type="button" class="mm-handle" aria-label="Reorder ' + esc(name) + " (position " + (i + 1) + " of " + n + '). Use arrow keys to move.">' + I.grip + "</button>" +
           '<div class="mm-actions">' +
           '<button type="button" class="mm-btn' + (isCover ? " is-on" : "") + '" data-act="cover" aria-pressed="' + isCover + '" aria-label="Use as cover">' + (isCover ? I.starFill : I.star) + "</button>" +
           '<button type="button" class="mm-btn danger" data-act="remove" aria-label="Remove ' + esc(name) + '">' + I.trash + "</button>" +
           "</div></div>" +
           '<div class="mm-bottom"><span class="mm-pos">' + (i + 1) + "</span>" +
-          (isCover ? '<span class="cover-badge">' + "Cover</span>" : '<span class="mm-type">' + (m.type === "video" ? I.video + "Video" : "") + "</span>") +
+          (isCover ? '<span class="cover-badge">Cover</span>' : '<span class="mm-type">' + (m.type === "video" ? I.video + "Video" : "") + "</span>") +
           "</div></div>"
         );
       })
       .join("");
+    /* Formats the browser cannot preview (e.g. HEIC outside Safari) show a label instead. */
+    box.querySelectorAll("img").forEach(function (img) {
+      img.addEventListener("error", function () {
+        var label = document.createElement("span");
+        label.className = "mm-fallback";
+        label.textContent = "Preview not available in this browser";
+        img.replaceWith(label);
+      });
+    });
+  }
+
+  function mediaAction(promise, item) {
+    if (item) item.classList.add("is-busy");
+    return promise
+      .then(function (place) {
+        replacePlace(place);
+        renderMedia();
+        renderList();
+        return place;
+      })
+      .catch(function (err) {
+        if (item) item.classList.remove("is-busy");
+        if (err.status === 409 || err.status === 404) reloadCurrent();
+        failed(err);
+      });
+  }
+
+  function orderedIds() {
+    return current.media.slice().sort(function (a, b) {
+      return a.position - b.position;
+    }).map(function (m) {
+      return m.id;
+    });
   }
 
   function moveItem(from, to) {
-    if (to < 0 || to >= draft.media.length || from === to) return;
-    var item = draft.media.splice(from, 1)[0];
-    draft.media.splice(to, 0, item);
-    draft.media.forEach(function (m, i) {
-      m.position = i;
+    var ids = orderedIds();
+    if (to < 0 || to >= ids.length || from === to) return;
+    var moved = ids.splice(from, 1)[0];
+    ids.splice(to, 0, moved);
+    // Show the new order right away, then confirm with the server.
+    ids.forEach(function (id, i) {
+      current.media.filter(function (m) {
+        return m.id === id;
+      })[0].position = i;
     });
-    setDirty(true);
     renderMedia();
-  }
-
-  function indexOfId(id) {
-    for (var i = 0; i < draft.media.length; i++) if (draft.media[i].id === id) return i;
-    return -1;
+    mediaAction(request("PUT", "/places/" + encodeURIComponent(current.id) + "/media/order", { order: ids }));
   }
 
   function bindMedia() {
@@ -230,25 +413,26 @@
 
     box.addEventListener("click", function (e) {
       var btn = e.target.closest("[data-act]");
-      if (!btn) return;
-      var id = btn.closest(".mm-item").getAttribute("data-id");
+      if (!btn || !current) return;
+      var item = btn.closest(".mm-item");
+      var id = item.getAttribute("data-id");
+      var base = "/places/" + encodeURIComponent(current.id) + "/media";
       if (btn.getAttribute("data-act") === "cover") {
-        draft.coverMediaId = id;
-        TM.ui.toast("Cover updated");
-      } else {
-        var i = indexOfId(id);
-        draft.media.splice(i, 1);
-        if (draft.coverMediaId === id) draft.coverMediaId = draft.media[0] ? draft.media[0].id : null;
+        mediaAction(request("PUT", base + "/cover", { mediaId: id }), item).then(function (p) {
+          if (p) TM.ui.toast("Cover updated");
+        });
+      } else if (window.confirm("Remove this item? The original file will be deleted.")) {
+        mediaAction(request("DELETE", base + "/" + encodeURIComponent(id)), item).then(function (p) {
+          if (p) TM.ui.toast("Removed");
+        });
       }
-      setDirty(true);
-      renderMedia();
     });
 
-    /* Keyboard reordering on the grip handle. */
     box.addEventListener("keydown", function (e) {
       if (!e.target.classList.contains("mm-handle")) return;
       var id = e.target.closest(".mm-item").getAttribute("data-id");
-      var i = indexOfId(id);
+      var ids = orderedIds();
+      var i = ids.indexOf(id);
       var to = null;
       if (e.key === "ArrowLeft" || e.key === "ArrowUp") to = i - 1;
       if (e.key === "ArrowRight" || e.key === "ArrowDown") to = i + 1;
@@ -259,12 +443,12 @@
       if (h) h.focus();
     });
 
-    /* Pointer drag & drop (mouse + touch) starting from anywhere on the tile except buttons. */
+    /* Pointer drag & drop (mouse anywhere on the tile, touch on the handle). */
     var drag = null;
     box.addEventListener("pointerdown", function (e) {
       var item = e.target.closest(".mm-item");
-      if (!item || (e.target.closest(".mm-btn")) || (e.pointerType === "mouse" && e.button !== 0)) return;
-      if (e.pointerType !== "mouse" && !e.target.closest(".mm-handle")) return; /* touch: handle only, keep scrolling natural */
+      if (!item || e.target.closest(".mm-btn") || (e.pointerType === "mouse" && e.button !== 0)) return;
+      if (e.pointerType !== "mouse" && !e.target.closest(".mm-handle")) return;
       e.preventDefault();
       var r = item.getBoundingClientRect();
       drag = { id: item.getAttribute("data-id"), el: item, ox: e.clientX - r.left, oy: e.clientY - r.top, w: r.width, h: r.height, sx: e.clientX, sy: e.clientY, ghost: null, target: null };
@@ -278,8 +462,8 @@
         g.className = "mm-ghost";
         g.style.width = drag.w + "px";
         g.style.height = drag.h + "px";
-        var v = drag.el.querySelector("img, video").cloneNode();
-        g.appendChild(v);
+        var visual = drag.el.querySelector("img, video, .mm-fallback");
+        if (visual) g.appendChild(visual.cloneNode(true));
         document.body.appendChild(g);
         drag.ghost = g;
         drag.el.classList.add("is-dragging");
@@ -303,97 +487,131 @@
       d.el.classList.remove("is-dragging");
       if (d.target) {
         d.target.classList.remove("is-drop-target");
-        moveItem(indexOfId(d.id), indexOfId(d.target.getAttribute("data-id")));
+        var ids = orderedIds();
+        moveItem(ids.indexOf(d.id), ids.indexOf(d.target.getAttribute("data-id")));
       }
     }
     window.addEventListener("pointerup", endDrag);
     window.addEventListener("pointercancel", endDrag);
   }
 
-  /* ---------- Uploads (simulated) ---------- */
+  /* ---------- uploads ---------- */
   function classify(file) {
     var ext = (file.name.split(".").pop() || "").toLowerCase();
-    var kind = LIMITS.image.ext.indexOf(ext) !== -1 ? "image" : LIMITS.video.ext.indexOf(ext) !== -1 ? "video" : null;
-    if (!kind) return { error: "Unsupported file type ." + ext };
-    if (file.type && LIMITS[kind].types.indexOf(file.type) === -1) return { error: "File content does not match its extension" };
+    var type = (file.type || EXT_TYPES[ext] || "").toLowerCase();
+    if (type === "image/heif") type = "image/heic";
+    var kind = LIMITS.image.types.indexOf(type) !== -1 ? "image" : LIMITS.video.types.indexOf(type) !== -1 ? "video" : null;
+    if (!kind || LIMITS[kind].ext.indexOf(ext) === -1) return { error: "Unsupported file type" + (ext ? " ." + ext : "") };
     if (file.size > LIMITS[kind].max) return { error: "Too large — max " + fmtSize(LIMITS[kind].max) };
-    return { kind: kind };
+    if (!file.size) return { error: "The file is empty" };
+    return { kind: kind, type: type };
   }
 
-  function dimensions(url, kind) {
+  function dimensions(file, kind) {
     return new Promise(function (resolve) {
+      var url = URL.createObjectURL(file);
+      var done = function (w, h) {
+        URL.revokeObjectURL(url);
+        resolve(w && h ? { w: w, h: h } : null);
+      };
       if (kind === "image") {
         var img = new Image();
         img.onload = function () {
-          resolve({ w: img.naturalWidth, h: img.naturalHeight });
+          done(img.naturalWidth, img.naturalHeight);
         };
         img.onerror = function () {
-          resolve({ w: 1200, h: 900 });
+          done();
         };
         img.src = url;
       } else {
         var v = document.createElement("video");
         v.preload = "metadata";
         v.onloadedmetadata = function () {
-          resolve({ w: v.videoWidth || 1280, h: v.videoHeight || 720 });
+          done(v.videoWidth, v.videoHeight);
         };
         v.onerror = function () {
-          resolve({ w: 1280, h: 720 });
+          done();
         };
         v.src = url;
       }
+      setTimeout(function () {
+        done();
+      }, 8000);
     });
   }
 
+  /* XMLHttpRequest because fetch() cannot report upload progress. */
+  function send(placeId, file, type, size, onProgress) {
+    return new Promise(function (resolve, reject) {
+      var xhr = new XMLHttpRequest();
+      xhr.open("POST", API + "/places/" + encodeURIComponent(placeId) + "/media");
+      xhr.setRequestHeader("Content-Type", type);
+      xhr.setRequestHeader("X-Filename", encodeURIComponent(file.name));
+      if (size) {
+        xhr.setRequestHeader("X-Media-Width", String(size.w));
+        xhr.setRequestHeader("X-Media-Height", String(size.h));
+      }
+      xhr.upload.onprogress = function (e) {
+        if (e.lengthComputable) onProgress(e.loaded / e.total);
+      };
+      xhr.onload = function () {
+        var data = null;
+        try {
+          data = JSON.parse(xhr.responseText);
+        } catch (e) {}
+        if (xhr.status === 401) location.href = "/admin/login";
+        if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+        else reject(new ApiError(xhr.status, data));
+      };
+      xhr.onerror = function () {
+        reject(new ApiError(0, { error: { message: "Network error during upload" } }));
+      };
+      xhr.send(file);
+    });
+  }
+
+  var queue = Promise.resolve();
+
   function upload(files) {
+    if (!current) return;
+    var placeId = current.id;
     Array.prototype.forEach.call(files, function (file) {
       var check = classify(file);
       var row = document.createElement("div");
       row.className = "upload-row";
-      var url = check.kind ? URL.createObjectURL(file) : "";
       row.innerHTML =
-        (check.kind === "image" ? '<img class="thumb" alt="" src="' + esc(url) + '">' : '<span class="thumb" style="display:grid;place-items:center;color:var(--ocean)">' + (check.kind === "video" ? I.video : I.alert) + "</span>") +
-        '<div style="min-width:0"><div class="name">' + esc(file.name) + '</div><div class="sub">' + fmtSize(file.size) + '</div><div class="progress"><span></span></div></div>' +
+        '<span class="thumb" style="display:grid;place-items:center;color:var(--ocean)">' + (check.kind === "video" ? I.video : check.kind ? I.image : I.alert) + "</span>" +
+        '<div style="min-width:0"><div class="name">' + esc(file.name) + '</div><div class="sub">' + fmtSize(file.size) + (check.error ? "" : " · Waiting…") + '</div><div class="progress"><span></span></div></div>' +
         '<span class="state"></span>';
       $("upload-list").prepend(row);
+      var sub = row.querySelector(".sub");
+      var bar = row.querySelector(".progress span");
 
       if (check.error) {
         row.classList.add("is-error");
-        row.querySelector(".sub").textContent = check.error;
+        sub.textContent = check.error;
         row.querySelector(".progress").remove();
         row.querySelector(".state").innerHTML = I.alert;
         return;
       }
 
-      var bar = row.querySelector(".progress span");
-      var sub = row.querySelector(".sub");
-      var pct = 0;
-      var speed = 4 + Math.random() * 10;
-      var timer = setInterval(function () {
-        pct = Math.min(100, pct + speed * (0.6 + Math.random()));
-        bar.style.width = pct + "%";
-        sub.textContent = fmtSize(file.size) + " · " + Math.round(pct) + "%";
-        if (pct >= 100) {
-          clearInterval(timer);
-          dimensions(url, check.kind).then(function (d) {
-            newCounter++;
-            var m = {
-              id: "new-" + Date.now().toString(36) + "-" + newCounter,
-              type: check.kind,
-              filename: url,
-              width: d.w,
-              height: d.h,
-              altText: { en: file.name.replace(/\.[^.]+$/, "") },
-              position: draft.media.length,
-              isNew: true
-            };
-            draft.media.push(m);
-            if (!draft.coverMediaId) draft.coverMediaId = m.id;
+      // One upload at a time keeps the place version predictable and the connection free.
+      queue = queue.then(function () {
+        return dimensions(file, check.kind)
+          .then(function (size) {
+            return send(placeId, file, check.type, size, function (p) {
+              bar.style.width = Math.round(p * 100) + "%";
+              sub.textContent = fmtSize(file.size) + " · " + Math.round(p * 100) + "%";
+            });
+          })
+          .then(function (place) {
+            replacePlace(place);
+            if (current && current.id === place.id) renderMedia();
+            renderList();
             row.classList.add("is-done");
+            bar.style.width = "100%";
             sub.textContent = fmtSize(file.size) + " · Uploaded";
             row.querySelector(".state").innerHTML = I.check;
-            setDirty(true);
-            renderMedia();
             setTimeout(function () {
               row.style.transition = "opacity 400ms";
               row.style.opacity = "0";
@@ -401,9 +619,15 @@
                 row.remove();
               }, 400);
             }, 2200);
+          })
+          .catch(function (err) {
+            row.classList.add("is-error");
+            var progress = row.querySelector(".progress");
+            if (progress) progress.remove();
+            sub.textContent = err.message;
+            row.querySelector(".state").innerHTML = I.alert;
           });
-        }
-      }, 120);
+      });
     });
   }
 
@@ -417,7 +641,7 @@
     ["dragenter", "dragover"].forEach(function (ev) {
       dz.addEventListener(ev, function (e) {
         e.preventDefault();
-        dz.classList.add("is-over");
+        if (current) dz.classList.add("is-over");
       });
     });
     ["dragleave", "drop"].forEach(function (ev) {
@@ -429,7 +653,6 @@
       e.preventDefault();
       if (e.dataTransfer && e.dataTransfer.files.length) upload(e.dataTransfer.files);
     });
-    /* Avoid the browser opening a file dropped next to the zone. */
     window.addEventListener("dragover", function (e) {
       e.preventDefault();
     });
@@ -438,107 +661,82 @@
     });
   }
 
-  /* ---------- Save / discard / delete ---------- */
-  function validate() {
-    var ok = true;
-    [
-      ["f-name", draft.name.en],
-      ["f-city", draft.city],
-      ["f-country", draft.country.en]
-    ].forEach(function (pair) {
-      var bad = !String(pair[1] || "").trim();
-      $(pair[0]).classList.toggle("has-error", bad);
-      if (bad) ok = false;
-    });
-    if (!ok) {
-      tab = "en";
-      renderTabs();
-      var first = document.querySelector(".field.has-error .input");
-      if (first) first.focus();
-    }
-    return ok;
+  /* ---------- actions ---------- */
+  function confirmLeave() {
+    return !dirty || window.confirm("You have unsaved changes. Leave this destination anyway?");
   }
 
   function bindActions() {
-    $("save").addEventListener("click", function () {
-      if (!validate()) return;
-      var btn = $("save");
-      btn.classList.add("is-loading");
-      btn.innerHTML = '<span class="spinner"></span> Saving…';
-      setTimeout(function () {
-        var now = new Date().toISOString();
-        draft.media.forEach(function (m, i) {
-          m.position = i;
-          delete m.isNew;
-        });
-        if (!draft.id) {
-          draft.slug = slugify(draft.name.en) || "place";
-          draft.id = draft.slug + "-" + new Date().getFullYear();
-          draft.createdAt = now;
-          if (!draft.country.fr) draft.country.fr = draft.country.en;
-          places.unshift(draft);
-        } else {
-          places = places.map(function (p) {
-            return p.id === draft.id ? draft : p;
-          });
-        }
-        draft.updatedAt = now;
-        btn.classList.remove("is-loading");
-        btn.innerHTML = "Save &amp; publish";
-        TM.ui.toast("“" + draft.name.en + "” published");
-        load(clone(draft));
-      }, 800);
-    });
-
+    $("save").addEventListener("click", save);
     $("discard").addEventListener("click", function () {
-      var saved = places.filter(function (p) {
-        return p.id === selectedId;
-      })[0];
-      load(saved ? clone(saved) : null);
+      load(current);
       TM.ui.toast("Changes discarded");
     });
 
     $("new-place").innerHTML = I.plus + "New destination";
     $("new-place").addEventListener("click", function () {
+      if (!confirmLeave()) return;
       load(null);
       $("name").focus();
     });
 
     $("dest-list").addEventListener("click", function (e) {
       var b = e.target.closest(".dest-item");
-      if (!b) return;
-      if (dirty && !window.confirm("You have unsaved changes. Leave this destination anyway?")) return;
+      if (!b || !confirmLeave()) return;
       var p = places.filter(function (x) {
         return x.id === b.getAttribute("data-id");
       })[0];
-      load(clone(p));
+      load(p);
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
 
     var dlg = $("confirm-delete");
     $("delete-place").addEventListener("click", function () {
-      $("confirm-name").textContent = draft.name.en;
+      $("confirm-name").textContent = current.name.en;
       if (dlg.showModal) dlg.showModal();
     });
     $("confirm-cancel").addEventListener("click", function () {
       dlg.close();
     });
     $("confirm-ok").addEventListener("click", function () {
-      var name = draft.name.en;
-      places = places.filter(function (p) {
-        return p.id !== selectedId;
-      });
-      dlg.close();
-      load(places[0] ? clone(places[0]) : null);
-      TM.ui.toast("“" + name + "” deleted");
+      var gone = current;
+      request("DELETE", "/places/" + encodeURIComponent(gone.id), undefined, { "If-Match": '"' + gone.version + '"' })
+        .then(function () {
+          places = places.filter(function (p) {
+            return p.id !== gone.id;
+          });
+          dlg.close();
+          load(places[0] || null);
+          TM.ui.toast("“" + gone.name.en + "” deleted");
+        })
+        .catch(function (err) {
+          dlg.close();
+          if (err.status === 412) {
+            TM.ui.toast("This destination changed meanwhile — reloaded, please check before deleting.");
+            reloadCurrent();
+            return;
+          }
+          failed(err);
+        });
     });
 
     $("logout").addEventListener("click", function (e) {
-      if (dirty && !window.confirm("You have unsaved changes. Sign out anyway?")) e.preventDefault();
+      e.preventDefault();
+      if (!confirmLeave()) return;
+      fetch(API + "/logout", { method: "POST", credentials: "same-origin" }).then(function () {
+        location.href = "/admin/login";
+      });
+    });
+
+    window.addEventListener("beforeunload", function (e) {
+      if (dirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
     });
   }
 
-  /* ---------- Mobile sidebar ---------- */
+  /* ---------- mobile sidebar ---------- */
   function closeSide() {
     $("admin-side").classList.remove("is-open");
     $("side-toggle").setAttribute("aria-expanded", "false");
@@ -560,6 +758,19 @@
     bindUploads();
     bindActions();
     bindSide();
-    load(clone(places[0]));
+    request("GET", "/session")
+      .then(function (s) {
+        if (!s.authenticated) {
+          location.href = "/admin/login";
+          return;
+        }
+        $("avatar").textContent = (s.username || "?").charAt(0).toUpperCase();
+        $("view-live").href = "/";
+        return request("GET", "/places").then(function (data) {
+          places = data.places;
+          load(places[0] || null);
+        });
+      })
+      .catch(failed);
   });
 })();

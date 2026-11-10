@@ -4,7 +4,7 @@ import { handlePublic } from "./public.js";
 import { handleAdmin } from "./admin.js";
 import { getSession } from "../services/auth.js";
 
-export const VERSION = "0.2.0";
+export const VERSION = "0.3.0";
 
 async function health(env) {
   let storage = "unbound";
