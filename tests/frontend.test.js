@@ -74,3 +74,18 @@ test("the quote never repeats the previous visit's quote", () => {
     for (const r of [0, 0.5, 0.999]) assert.notEqual(TM.quotes.pick(keys, last, () => r), last);
   assert.equal(TM.quotes.pick(["only"], "only", () => 0), "only");
 });
+
+test("cover pictures fall back to a photo when the cover is a video without poster", () => {
+  const ctx = { window: {}, document: { documentElement: { getAttribute: () => null } } };
+  vm.runInNewContext(readFileSync(new URL("../public/assets/js/api.js", import.meta.url), "utf8"), ctx);
+  const api = ctx.window.TM.api;
+  const video = { id: "v", type: "video", url: "/m/v", variants: {} };
+  const photo = { id: "p", type: "image", url: "/m/p", variants: { thumb: { url: "/m/p?variant=thumb", width: 640, height: 427 } } };
+  assert.equal(api.coverImage({ coverMediaId: "v", media: [video, photo] }, "thumb").src, "/m/p?variant=thumb");
+  assert.equal(api.coverImage({ coverMediaId: "v", media: [video] }, "thumb"), null);
+  const posterVideo = { ...video, variants: { poster: { url: "/m/v?variant=poster", width: 1600, height: 900 } } };
+  assert.equal(api.coverImage({ coverMediaId: "v", media: [posterVideo, photo] }, "thumb").src, "/m/v?variant=poster");
+  assert.equal(api.coverImage({ coverMediaId: null, media: [] }, "thumb"), null);
+  assert.equal(api.image(photo, "display").src, "/m/p?variant=thumb", "missing display falls back to thumb");
+  assert.equal(api.image({ id: "o", type: "image", url: "/m/o", variants: {} }, "display").src, "/m/o", "no previews → original");
+});

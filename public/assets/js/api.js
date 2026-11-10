@@ -81,9 +81,18 @@
     );
   }
 
-  /* A cover that can be shown as a picture (photo, or video with a poster). */
+  /*
+   * A cover that can be shown as a picture: the chosen cover if it is a photo (or a video
+   * with a poster), otherwise the first media item that can be shown as a picture.
+   */
   function coverImage(place, size) {
-    return image(cover(place), size);
+    var chosen = image(cover(place), size);
+    if (chosen || !place) return chosen;
+    for (var i = 0; i < place.media.length; i++) {
+      var candidate = image(place.media[i], size);
+      if (candidate) return candidate;
+    }
+    return null;
   }
 
   /* Up to four destinations with a picture cover, for the homepage hero. */
