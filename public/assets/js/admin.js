@@ -138,13 +138,24 @@
     })[0];
   }
 
+  /*
+   * Small picture for a destination, same rule as the public site: the cover if it can be
+   * shown as an image (photo, or video with a poster), otherwise the first media item that can.
+   */
+  function coverPreviewUrl(place) {
+    var c = coverOf(place);
+    var src = c && previewUrl(c, "thumb");
+    for (var i = 0; !src && i < place.media.length; i++) src = previewUrl(place.media[i], "thumb");
+    return src || null;
+  }
+
   /* ---------- sidebar ---------- */
   function renderList() {
     $("dest-list").innerHTML = places.length
       ? places
           .map(function (p) {
             var c = coverOf(p);
-            var src = c && previewUrl(c, "thumb");
+            var src = coverPreviewUrl(p);
             var thumb = src ? '<img alt="" loading="lazy" src="' + esc(src) + '">' : '<span class="ph">' + (c ? I.video : I.image) + "</span>";
             return (
               '<li><button type="button" class="dest-item" data-id="' + esc(p.id) + '" aria-current="' + Boolean(current && p.id === current.id) + '">' +
