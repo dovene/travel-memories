@@ -96,6 +96,22 @@ for (const name of ["staging", "production"]) {
   if (topBucket && topBucket === envs[name].bucket) fail(`Top-level R2 bucket "${topBucket}" collides with [env.${name}]`);
 }
 
+// The local-only admin sign-in (DEV_OWNER_ID) belongs in the git-ignored .dev.vars, never in deployed config.
+if (/DEV_OWNER_ID/.test(toml)) fail("wrangler.toml must not define DEV_OWNER_ID (local .dev.vars only)");
+
+// Schemas must be valid JSON and only use keywords the runtime validator enforces.
+{
+  const { validate } = await import(join(root, "src/utils/schema.js"));
+  for (const f of files.filter((f) => f.includes("/schemas/") && f.endsWith(".json"))) {
+    try {
+      const schema = JSON.parse(readFileSync(f, "utf8"));
+      validate(schema, {}); // throws on unsupported keywords
+    } catch (e) {
+      fail(`${relative(root, f)}: ${e.message}`);
+    }
+  }
+}
+
 // 4. Secrets in frontend code
 const secretPatterns = [/api[_-]?token\s*[:=]\s*["'][^"']{12,}/i, /password\s*[:=]\s*["'][^"']+["']/i, /secret\s*[:=]\s*["'][^"']{8,}/i, /BEGIN [A-Z ]*PRIVATE KEY/];
 for (const f of files.filter((f) => f.includes("/public/") && /\.(js|html)$/.test(f))) {

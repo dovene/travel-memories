@@ -1,6 +1,6 @@
-/* Consistent JSON responses and security headers for the API. */
+/* Consistent JSON responses, errors and security headers for the API. */
 
-const SECURITY_HEADERS = {
+export const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "X-Frame-Options": "DENY",
@@ -18,11 +18,26 @@ export function json(data, status = 200, headers = {}) {
   });
 }
 
-/* Errors never expose internals: a stable code plus a human-readable message. */
-export function error(status, code, message) {
-  return json({ error: { code, message } }, status);
+/*
+ * Errors thrown anywhere in request handling. The router turns them into
+ * { error: { code, message, details? } } responses; anything else becomes a generic 500.
+ */
+export class ApiError extends Error {
+  constructor(status, code, message, details) {
+    super(message);
+    this.status = status;
+    this.code = code;
+    this.details = details;
+  }
 }
 
-export const notFound = () => error(404, "not_found", "Resource not found.");
+export function error(status, code, message, details) {
+  const body = { error: { code, message } };
+  if (details !== undefined) body.error.details = details;
+  return json(body, status);
+}
+
+export const notFound = (message = "Resource not found.") => error(404, "not_found", message);
+
 export const methodNotAllowed = (allow) =>
   new Response(null, { status: 405, headers: { Allow: allow.join(", "), ...SECURITY_HEADERS } });

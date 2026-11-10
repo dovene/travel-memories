@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "travel-memories/profile.schema.json",
+  "title": "Travel Memories — owner profile",
+  "description": "Stored at content/users/<ownerId>/profile.json. One document per owner.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "ownerId", "username", "displayName"],
+  "properties": {
+    "schemaVersion": { "const": 1, "description": "Format version of this document." },
+    "ownerId": { "$ref": "#/$defs/identifier", "description": "Stable owner identifier. Never changes." },
+    "username": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$",
+      "description": "Public handle used in URLs (/@username). Lowercase letters, digits and hyphens."
+    },
+    "displayName": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "description": { "$ref": "#/$defs/localizedText" },
+    "createdAt": { "$ref": "#/$defs/timestamp" },
+    "updatedAt": { "$ref": "#/$defs/timestamp" }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$" },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$",
+      "description": "UTC timestamp, ISO 8601."
+    },
+    "localizedText": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Text per language. English is the fallback when a translation is missing.",
+      "properties": {
+        "en": { "type": "string", "maxLength": 300 },
+        "fr": { "type": "string", "maxLength": 300 }
+      }
+    }
+  }
+}

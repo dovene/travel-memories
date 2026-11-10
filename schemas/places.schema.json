@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "travel-memories/places.schema.json",
+  "title": "Travel Memories — places of one owner",
+  "description": "Stored at content/users/<ownerId>/places.json. Holds every destination of one owner. Media files live at media/users/<ownerId>/<placeId>/<filename>. Rules a schema cannot express (unique ids and slugs, cover must exist, positions 0..n-1, owner consistency) are enforced by src/utils/validation.js.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "ownerId", "places"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "ownerId": { "$ref": "#/$defs/identifier" },
+    "places": { "type": "array", "maxItems": 2000, "items": { "$ref": "#/$defs/place" } }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$" },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
+    },
+    "localizedName": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["en"],
+      "description": "English is required and is the fallback; French is optional.",
+      "properties": {
+        "en": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "fr": { "type": "string", "maxLength": 80 }
+      }
+    },
+    "localizedText": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "en": { "type": "string", "maxLength": 1000 },
+        "fr": { "type": "string", "maxLength": 1000 }
+      }
+    },
+    "place": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "ownerId", "slug", "version", "name", "city", "country", "countryCode", "coverMediaId", "media", "createdAt", "updatedAt"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier", "description": "Stable identifier; also the media folder name." },
+        "ownerId": { "$ref": "#/$defs/identifier" },
+        "slug": {
+          "type": "string",
+          "maxLength": 80,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "description": "URL segment, unique per owner."
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Incremented on every change; clients send it back in If-Match to avoid overwriting newer edits."
+        },
+        "name": { "$ref": "#/$defs/localizedName" },
+        "description": { "$ref": "#/$defs/localizedText" },
+        "city": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "country": { "$ref": "#/$defs/localizedName" },
+        "countryCode": { "type": "string", "pattern": "^[A-Z]{2}$", "description": "ISO 3166-1 alpha-2." },
+        "visitedAt": {
+          "type": "string",
+          "pattern": "^\\d{4}(-(0[1-9]|1[0-2]))?$",
+          "description": "Year or year-month of the visit (YYYY or YYYY-MM)."
+        },
+        "coverMediaId": {
+          "type": ["string", "null"],
+          "description": "Id of an item in media; null only when media is empty."
+        },
+        "media": { "type": "array", "maxItems": 500, "items": { "$ref": "#/$defs/media" } },
+        "createdAt": { "$ref": "#/$defs/timestamp" },
+        "updatedAt": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "media": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "filename", "contentType", "size", "position"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier", "description": "Stable identifier, independent of the filename." },
+        "type": { "enum": ["image", "video"] },
+        "filename": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$",
+          "description": "Stored file name of the original, inside media/users/<ownerId>/<placeId>/."
+        },
+        "originalFilename": { "type": "string", "maxLength": 255, "description": "Name of the file as uploaded." },
+        "contentType": {
+          "enum": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/avif", "video/mp4", "video/quicktime", "video/webm"]
+        },
+        "size": { "type": "integer", "minimum": 1, "description": "Bytes." },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "altText": { "$ref": "#/$defs/localizedText" },
+        "position": { "type": "integer", "minimum": 0, "description": "Display order, 0..n-1 without gaps." },
+        "uploadedAt": { "$ref": "#/$defs/timestamp" }
+      }
+    }
+  }
+}
