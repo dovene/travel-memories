@@ -832,6 +832,24 @@ body.admin {
   pointer-events: none;
 }
 
+.mm-item.is-pending {
+  box-shadow: 0 0 0 1.5px var(--ocean), 0 0 0 4px rgba(36, 123, 160, 0.15);
+}
+
+.mm-item.is-pending img,
+.mm-item.is-pending video {
+  opacity: 0.85;
+}
+
+.pending-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ocean);
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+}
+
 .mm-empty {
   grid-column: 1 / -1;
   padding: var(--space-6);

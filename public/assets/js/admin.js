@@ -51,6 +51,8 @@
   var current = null; // server copy of the selected place (null = new destination)
   var draft = null;   // locally edited text fields
   var dirty = false;
+  /* Files added to a destination that is not saved yet: uploaded right after the first save. */
+  var pending = []; // { key, file, kind, url }
   var tab = "en";
 
   var $ = function (id) {
@@ -99,6 +101,7 @@
   }
 
   function setDirty(v) {
+    if (!current && pending.length) v = true; // queued files count as unsaved work
     dirty = v;
     var s = $("save-state");
     s.classList.toggle("is-dirty", v);
@@ -175,7 +178,15 @@
     });
   }
 
+  function clearPending() {
+    pending.forEach(function (p) {
+      URL.revokeObjectURL(p.url);
+    });
+    pending = [];
+  }
+
   function load(place) {
+    clearPending();
     current = place;
     draft = draftFrom(place);
     tab = "en";
@@ -305,10 +316,14 @@
     var op = current
       ? request("PUT", "/places/" + encodeURIComponent(current.id), payload(), { "If-Match": '"' + current.version + '"' })
       : request("POST", "/places", payload());
+    var queued = current ? [] : pending.map(function (p) {
+      return p.file;
+    });
     op.then(function (place) {
       replacePlace(place);
-      load(place);
-      TM.ui.toast("“" + place.name.en + "” saved");
+      load(place); // also clears the local queue
+      TM.ui.toast("“" + place.name.en + "” saved" + (queued.length ? " — uploading " + queued.length + " file" + (queued.length === 1 ? "" : "s") + "…" : ""));
+      if (queued.length) upload(queued);
     })
       .catch(function (err) {
         if (err.status === 412) {
@@ -337,12 +352,16 @@
   /* ---------- media ---------- */
   function renderMedia() {
     var box = $("media-manager");
-    var locked = !current;
-    $("dropzone").classList.toggle("is-locked", locked);
-    $("dz-title").textContent = locked ? "Save the details first" : "Drop photos and videos here";
-    $("dz-text").innerHTML = locked
-      ? "Photos and videos can be added once the destination exists."
-      : "or <u>browse your files</u> — JPG, PNG, WEBP, HEIC, AVIF, MP4, MOV, WEBM · up to 25 MB per photo, 95 MB per video";
+    $("dropzone").classList.remove("is-locked");
+    $("dz-title").textContent = "Drop photos and videos here";
+    $("dz-text").innerHTML =
+      "or <u>browse your files</u> — JPG, PNG, WEBP, HEIC, AVIF, MP4, MOV, WEBM · up to 25 MB per photo, 95 MB per video" +
+      (current ? "" : "<br>They upload as soon as you save the destination.");
+
+    if (!current) {
+      renderPending(box);
+      return;
+    }
 
     var media = current ? current.media.slice().sort(function (a, b) {
       return a.position - b.position;
@@ -353,7 +372,7 @@
     $("media-count").textContent = photos + " photo" + (photos === 1 ? "" : "s") + " · " + (media.length - photos) + " video" + (media.length - photos === 1 ? "" : "s");
 
     if (!media.length) {
-      box.innerHTML = locked ? "" : '<p class="mm-empty">No media yet. Add a few photos or videos above — the first one becomes the cover.</p>';
+      box.innerHTML = '<p class="mm-empty">No media yet. Add a few photos or videos above — the first one becomes the cover.</p>';
       return;
     }
     var n = media.length;
@@ -384,6 +403,44 @@
       })
       .join("");
     /* Formats the browser cannot preview (e.g. HEIC outside Safari) show a label instead. */
+    box.querySelectorAll("img").forEach(function (img) {
+      img.addEventListener("error", function () {
+        var label = document.createElement("span");
+        label.className = "mm-fallback";
+        label.textContent = "Preview not available in this browser";
+        img.replaceWith(label);
+      });
+    });
+  }
+
+  /* Queued files of a new destination: local previews only, nothing has been sent yet. */
+  function renderPending(box) {
+    var photos = pending.filter(function (p) {
+      return p.kind === "image";
+    }).length;
+    $("media-count").textContent = pending.length
+      ? photos + " photo" + (photos === 1 ? "" : "s") + " · " + (pending.length - photos) + " video" + (pending.length - photos === 1 ? "" : "s") + " waiting"
+      : "";
+    if (!pending.length) {
+      box.innerHTML = '<p class="mm-empty">Add photos and videos now — they upload when you save. The first one becomes the cover.</p>';
+      return;
+    }
+    box.innerHTML = pending
+      .map(function (p, i) {
+        var visual =
+          p.kind === "video"
+            ? '<video muted playsinline preload="metadata" src="' + esc(p.url) + '#t=0.5"></video>'
+            : '<img alt="" src="' + esc(p.url) + '">';
+        return (
+          '<div class="mm-item is-pending" data-pending="' + esc(p.key) + '">' +
+          visual +
+          '<div class="mm-top"><span></span><div class="mm-actions">' +
+          '<button type="button" class="mm-btn danger" data-act="remove-pending" aria-label="Remove ' + esc(p.file.name) + ' from the upload">' + I.trash + "</button>" +
+          "</div></div>" +
+          '<div class="mm-bottom"><span class="mm-pos">' + (i + 1) + '</span><span class="pending-badge">' + (i === 0 ? "Cover · " : "") + "Not uploaded yet</span></div></div>"
+        );
+      })
+      .join("");
     box.querySelectorAll("img").forEach(function (img) {
       img.addEventListener("error", function () {
         var label = document.createElement("span");
@@ -438,6 +495,16 @@
 
     box.addEventListener("click", function (e) {
       var btn = e.target.closest("[data-act]");
+      if (btn && btn.getAttribute("data-act") === "remove-pending") {
+        var key = btn.closest(".mm-item").getAttribute("data-pending");
+        pending = pending.filter(function (p) {
+          if (p.key === key) URL.revokeObjectURL(p.url);
+          return p.key !== key;
+        });
+        renderMedia();
+        setDirty(dirty);
+        return;
+      }
       if (!btn || !current) return;
       var item = btn.closest(".mm-item");
       var id = item.getAttribute("data-id");
@@ -472,7 +539,8 @@
     var drag = null;
     box.addEventListener("pointerdown", function (e) {
       var item = e.target.closest(".mm-item");
-      if (!item || e.target.closest(".mm-btn") || (e.pointerType === "mouse" && e.button !== 0)) return;
+      if (!item || !current || item.hasAttribute("data-pending")) return; // queued files are ordered as added
+      if (e.target.closest(".mm-btn") || (e.pointerType === "mouse" && e.button !== 0)) return;
       if (e.pointerType !== "mouse" && !e.target.closest(".mm-handle")) return;
       e.preventDefault();
       var r = item.getBoundingClientRect();
@@ -738,8 +806,29 @@
     });
   }
 
+  var pendingSeq = 0;
+
+  function queueForSave(files) {
+    Array.prototype.forEach.call(files, function (file) {
+      var check = classify(file);
+      if (check.error) {
+        var row = document.createElement("div");
+        row.className = "upload-row is-error";
+        row.innerHTML =
+          '<span class="thumb" style="display:grid;place-items:center;color:var(--ocean)">' + I.alert + "</span>" +
+          '<div style="min-width:0"><div class="name">' + esc(file.name) + '</div><div class="sub">' + esc(check.error) + "</div></div>" +
+          '<span class="state">' + I.alert + "</span>";
+        $("upload-list").prepend(row);
+        return;
+      }
+      pending.push({ key: "p" + ++pendingSeq, file: file, kind: check.kind, url: URL.createObjectURL(file) });
+    });
+    renderMedia();
+    setDirty(true);
+  }
+
   function upload(files) {
-    if (!current) return;
+    if (!current) return queueForSave(files);
     var placeId = current.id;
     Array.prototype.forEach.call(files, function (file) {
       var check = classify(file);
