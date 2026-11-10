@@ -13,7 +13,7 @@
   --ocean-600: #1d6787;
   --ocean-100: #d3ebf6;
   --navy-80: rgba(23, 45, 66, 0.8);
-  --navy-60: rgba(23, 45, 66, 0.62);
+  --navy-60: rgba(23, 45, 66, 0.74); /* ≥ 4.5:1 on white and sky (WCAG AA text) */
   --navy-40: rgba(23, 45, 66, 0.4);
   --navy-12: rgba(23, 45, 66, 0.12);
   --navy-06: rgba(23, 45, 66, 0.06);

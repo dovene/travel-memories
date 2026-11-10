@@ -9,8 +9,8 @@ One Cloudflare Worker serves the static frontend (`public/`) and the API (`/api/
 | 1 — Project foundation | ✅ Done 2026-11-10: staging and production deploy from `develop` and `main` |
 | 2 — Content storage and API | ✅ Done 2026-11-10 |
 | 3 — Authentication and administration | ✅ Done 2026-11-10 |
-| 4 — Public experience | 🔧 Built: public site reads the real API, image previews, empty and error states |
-| 5 | Not started |
+| 4 — Public experience | ✅ Done 2026-11-10 (plus the continuous place journey) |
+| 5 — Quality and production readiness | 🔧 Built: export/restore, security headers, accessibility fixes, device and security checks |
 
 ## Local development
 
@@ -147,6 +147,39 @@ node scripts/seed-content.js --target production --yes
 ```
 
 Seeding writes the username index, the profile and the 10 starter destinations (without media). Remote targets refuse to overwrite existing content unless you pass `--force`.
+
+## Backups: export and restore
+
+Everything can leave Cloudflare as plain files at any time. Staging and production need `npx wrangler login`.
+
+```bash
+npm run export -- --env production                 # → exports/production-<timestamp>/
+npm run export -- --env staging --out ~/Backups
+npm run restore -- --from exports/<folder> --target local
+npm run restore -- --from exports/<folder> --target production --yes --force
+```
+
+- **Export folder:** it mirrors the bucket, with `content/…` JSON documents and `media/…` originals and previews. It also contains a `manifest.json` with every file's size, type and SHA-256 checksum, and a `README.md` explaining the layout. It is readable and restorable without this application: any S3 tool can upload it (`rclone copy`, `aws s3 sync`). `exports/` is git-ignored.
+- **How the export works:** the JSON documents are read directly from the bucket. Media files are downloaded from the public media URLs, which serve the exact stored bytes, and checked against the sizes recorded in `places.json`. Files that `places.json` doesn't reference (for example from an interrupted upload) aren't exported.
+- **Restore safety:**
+  - it checks every checksum and validates the content before uploading anything;
+  - it refuses a bucket that already has content unless you pass `--force`, and production also needs `--yes`;
+  - it uploads media first and `places.json` last, so the site never points to a missing file.
+- **Tested:** a full staging export (16 files) was restored into local storage, and the local site then served all 13 media files byte-identical to the export.
+- **Routine:** run an export regularly, for example monthly or after a trip, and keep copies somewhere other than Cloudflare. The spec's long-term preservation goal depends on this.
+
+## Security headers and accessibility
+
+- **Security headers:** `public/_headers` gives every page:
+  - a Content-Security-Policy: scripts only from this site, no inline scripts or handlers, fonts only from Google Fonts, images, video and API calls only from this site;
+  - HSTS, `X-Frame-Options: DENY`, `nosniff`, a Referrer-Policy and a Permissions-Policy.
+
+  `npm run check` fails if an inline script or handler appears in the HTML, or if the policy is loosened.
+- **Accessibility:** every page passes axe-core 4.10 with no violations: homepage in English and French, place journey, fullscreen viewer, login and editor. Specific fixes:
+  - secondary text darkened to at least 4.5:1 contrast;
+  - heading levels kept in order across the journey;
+  - each gallery labelled with its destination's name;
+  - the editor's save bar is a labelled region, and its "saved / unsaved" text is announced to screen readers.
 
 ## Environments
 

@@ -6,7 +6,7 @@
  *  3. wrangler.toml keeps staging and production isolated (distinct Worker names and buckets).
  *  4. No obvious secrets are committed in frontend files.
  */
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, extname } from "node:path";
 import { execFileSync } from "node:child_process";
 import vm from "node:vm";
@@ -115,6 +115,22 @@ for (const name of ["staging", "production"]) {
       fail(`${relative(root, f)}: ${e.message}`);
     }
   }
+}
+
+// The Content-Security-Policy forbids inline scripts: keep pages free of them, and keep the policy strict.
+for (const f of files.filter((f) => f.includes("/public/") && f.endsWith(".html"))) {
+  const html = readFileSync(f, "utf8");
+  if (/<script(?![^>]*\bsrc=)[^>]*>/i.test(html)) fail(`${relative(root, f)} has an inline <script> (blocked by the CSP)`);
+  if (/\son[a-z]+\s*=\s*["']/i.test(html)) fail(`${relative(root, f)} has an inline event handler (blocked by the CSP)`);
+}
+for (const f of files.filter((f) => f.includes("/public/assets/js/"))) {
+  if (/\son[a-z]+=\\?["']/.test(readFileSync(f, "utf8").replace(/\.on[a-z]+\s*=/g, ""))) fail(`${relative(root, f)} builds HTML with an inline event handler (blocked by the CSP)`);
+}
+{
+  const headersFile = join(root, "public/_headers");
+  const csp = existsSync(headersFile) ? (readFileSync(headersFile, "utf8").match(/Content-Security-Policy:\s*(.+)/) || [])[1] || "" : "";
+  if (!csp) fail("public/_headers must define a Content-Security-Policy");
+  else if (/script-src[^;]*'unsafe-(inline|eval)'/.test(csp)) fail("The CSP must not allow inline or eval'd scripts");
 }
 
 // 4. Secrets in frontend code

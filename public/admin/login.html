@@ -16,7 +16,7 @@
   <body class="admin">
     <main class="login">
       <section class="login-visual" aria-hidden="true">
-        <img src="https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?auto=format&fit=crop&q=78&w=1400&h=1400" alt="" />
+        <img id="login-visual" alt="" hidden />
         <a class="brand" href="../index.html" tabindex="-1">
           <svg class="brand-mark" viewBox="0 0 40 40">
             <circle cx="20" cy="20" r="19" fill="none" stroke="currentColor" stroke-width="1.4" />
@@ -65,57 +65,6 @@
       </section>
     </main>
 
-    <script>
-      (function () {
-        var form = document.getElementById("login-form");
-        var btn = document.getElementById("login-btn");
-        var errorBox = document.getElementById("login-error");
-
-        function showError(text) {
-          errorBox.textContent = text;
-          errorBox.hidden = !text;
-        }
-
-        form.addEventListener("submit", function (e) {
-          e.preventDefault();
-          showError("");
-          var username = document.getElementById("username").value.trim();
-          var password = document.getElementById("password").value;
-          var ok = true;
-          [["f-user", username], ["f-pass", password]].forEach(function (pair) {
-            document.getElementById(pair[0]).classList.toggle("has-error", !pair[1]);
-            if (!pair[1]) ok = false;
-          });
-          if (!ok) return;
-
-          btn.classList.add("is-loading");
-          btn.innerHTML = '<span class="spinner"></span> Signing in…';
-          fetch("/api/admin/login", {
-            method: "POST",
-            credentials: "same-origin",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: username, password: password })
-          })
-            .then(function (res) {
-              if (res.ok) {
-                location.replace("/admin/");
-                return;
-              }
-              return res.json().catch(function () { return null; }).then(function (data) {
-                var message = data && data.error && data.error.message;
-                showError(message || "Sign-in failed. Please try again.");
-                document.getElementById("password").select();
-              });
-            })
-            .catch(function () {
-              showError("Network error — check your connection.");
-            })
-            .then(function () {
-              btn.classList.remove("is-loading");
-              btn.textContent = "Sign in";
-            });
-        });
-      })();
-    </script>
+    <script src="../assets/js/login.js"></script>
   </body>
 </html>

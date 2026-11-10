@@ -275,7 +275,7 @@
     return (
       '<div class="empty" style="column-span:all">' + TM.icons.compass +
       "<h3>" + esc(t("errors.loadTitle")) + "</h3><p>" + esc(t("errors.loadText")) + "</p>" +
-      '<button type="button" class="btn btn-primary" onclick="location.reload()">' + esc(t("errors.retry")) + "</button></div>"
+      '<button type="button" class="btn btn-primary" data-reload>' + esc(t("errors.retry")) + "</button></div>"
     );
   }
 
@@ -321,6 +321,7 @@
       if (!mediaCount.length) mediaCount.push(t("card.soon"));
       var position = (journey.list.indexOf(p) + 1) + " / " + journey.list.length;
       var Heading = n === 0 ? "h1" : "h2"; // one h1 per page; later destinations are h2
+      var Sub = n === 0 ? "h2" : "h3"; // gallery heading sits one level below its destination
       var id = "g-" + n;
 
       return (
@@ -343,8 +344,8 @@
         (p.visitedAt ? "<div><dt>" + esc(t("place.visited")) + "</dt><dd>" + esc(TM.i18n.formatMonth(p.visitedAt)) + "</dd></div>" : "") +
         "<div><dt>" + esc(t("place.media")) + "</dt><dd>" + esc(mediaCount.join(" · ")) + "</dd></div>" +
         "</dl></section>" +
-        '<section aria-labelledby="' + id + '">' +
-        '<div class="gallery-head"><h3 class="gallery-title" id="' + id + '">' + esc(t("place.gallery")) + "</h3>" +
+        '<section aria-label="' + esc(t("place.gallery") + " — " + pick(p.name)) + '">' +
+        '<div class="gallery-head"><' + Sub + ' class="gallery-title" id="' + id + '">' + esc(t("place.gallery")) + "</" + Sub + ">" +
         (p.media.length ? "<p>" + esc(t("place.galleryHint")) + "</p>" : "") + "</div>" +
         (p.media.length
           ? '<div class="media-grid"></div>'
@@ -490,6 +491,11 @@
         main.innerHTML = '<section class="section"><div class="container" style="padding-top:var(--header-h)">' + loadError() + "</div></section>";
       });
   }
+
+  /* "Try again" buttons (no inline handlers: the Content-Security-Policy forbids them). */
+  document.addEventListener("click", function (e) {
+    if (e.target.closest && e.target.closest("[data-reload]")) location.reload();
+  });
 
   document.addEventListener("DOMContentLoaded", function () {
     TM.i18n.apply();

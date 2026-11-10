@@ -1,6 +1,6 @@
 {
   "name": "travel-memories",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "Personal travel publishing platform on Cloudflare Workers + R2.",
   "type": "module",
@@ -17,7 +17,9 @@
     "deploy:production": "wrangler deploy --env production",
     "serve:prototype": "python3 scripts/serve.py",
     "seed:local": "node scripts/seed-content.js --target local",
-    "setup:admin": "node scripts/setup-admin.js"
+    "setup:admin": "node scripts/setup-admin.js",
+    "export": "node scripts/export-content.js",
+    "restore": "node scripts/restore-content.js"
   },
   "devDependencies": {
     "wrangler": "4.153.0"
