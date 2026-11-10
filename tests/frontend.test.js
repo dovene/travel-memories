@@ -9,13 +9,13 @@ function loadTM(files) {
   const ctx = {
     window: {},
     localStorage: { getItem: (k) => store[k] ?? null, setItem: (k, v) => (store[k] = v) },
-    document: { querySelectorAll: () => [], documentElement: {} },
+    document: { querySelectorAll: () => [], documentElement: {}, addEventListener: () => {} },
   };
   for (const f of files) vm.runInNewContext(readFileSync(new URL(`../public/assets/js/${f}`, import.meta.url), "utf8"), ctx);
   return ctx.window.TM;
 }
 
-const TM = loadTM(["i18n/en.js", "i18n/fr.js", "i18n.js", "data/mock-content.js", "filters.js"]);
+const TM = loadTM(["i18n/en.js", "i18n/fr.js", "i18n.js", "data/mock-content.js", "filters.js", "app.js"]);
 const places = TM.mock.places.places;
 // Array.from builds the array in this realm (the sandbox has its own Array).
 const names = (list) => Array.from(list, (p) => p.slug).sort();
@@ -57,4 +57,17 @@ test("mock content respects storage invariants", () => {
     assert.ok(p.media.some((m) => m.id === p.coverMediaId), `${p.id} cover references existing media`);
     p.media.forEach((m, i) => assert.equal(m.position, i, `${p.id}/${m.id} position`));
   }
+});
+
+test("there are at least 20 intro quotes, each with an emphasised word in both languages", () => {
+  const keys = Array.from(TM.quotes.keys());
+  assert.ok(keys.length >= 20, `only ${keys.length} quotes`);
+  for (const k of keys) for (const lang of ["en", "fr"]) assert.match(TM.locales[lang][k], /<em>[^<]+<\/em>/, `${lang} ${k}`);
+});
+
+test("the intro quote never repeats the previous visit's quote", () => {
+  const keys = TM.quotes.keys();
+  for (const last of keys)
+    for (const r of [0, 0.5, 0.999]) assert.notEqual(TM.quotes.pick(keys, last, () => r), last);
+  assert.equal(TM.quotes.pick(["only"], "only", () => 0), "only");
 });

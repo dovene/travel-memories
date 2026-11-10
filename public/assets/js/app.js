@@ -36,6 +36,44 @@
   }
 
   /* ---------- Home ---------- */
+
+  /*
+   * Intro quote: one of the "intro.quote.N" translations, chosen at random on each visit.
+   * The previous visit's quote is skipped so the same phrase never appears twice in a row,
+   * and the same quote stays in place when the language changes.
+   */
+  function quoteKeys() {
+    return Object.keys(TM.locales.en).filter(function (k) {
+      return /^intro\.quote\.\d+$/.test(k);
+    });
+  }
+
+  function pickQuote(keys, last, random) {
+    var pool = keys.length > 1 ? keys.filter(function (k) {
+      return k !== last;
+    }) : keys;
+    return pool[Math.floor((random || Math.random)() * pool.length)];
+  }
+
+  function initIntroQuote() {
+    var el = document.getElementById("intro-quote");
+    if (!el) return;
+    var last = null;
+    try {
+      last = localStorage.getItem("tm.lastQuote");
+    } catch (e) {}
+    var key = pickQuote(quoteKeys(), last);
+    try {
+      localStorage.setItem("tm.lastQuote", key);
+    } catch (e) {}
+    function render() {
+      el.innerHTML = t(key);
+    }
+    render();
+    TM.i18n.onChange(render);
+  }
+
+  TM.quotes = { keys: quoteKeys, pick: pickQuote };
   function initHero(places) {
     var slidesEl = document.querySelector(".hero-slides");
     var dotsEl = document.querySelector(".hero-dots");
@@ -301,8 +339,13 @@
     TM.i18n.onChange(initFooter);
     initHeader();
     initFooter();
+    // Static sections (e.g. the homepage intro) also fade in on scroll.
+    TM.ui.reveal(document);
     var page = document.body.getAttribute("data-page");
-    if (page === "home") initHome();
+    if (page === "home") {
+      initIntroQuote();
+      initHome();
+    }
     if (page === "place") initPlace();
   });
 })();
