@@ -459,6 +459,10 @@ p {
   line-height: 1.15;
 }
 
+.footer-quote em {
+  color: #8fd3f2;
+}
+
 .footer-bottom {
   display: flex;
   flex-wrap: wrap;

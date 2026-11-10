@@ -38,13 +38,13 @@
   /* ---------- Home ---------- */
 
   /*
-   * Intro quote: one of the "intro.quote.N" translations, chosen at random on each visit.
-   * The previous visit's quote is skipped so the same phrase never appears twice in a row,
+   * Footer quote: one of the "quote.N" translations, chosen at random on each page view.
+   * The previous quote is skipped so the same phrase never appears twice in a row,
    * and the same quote stays in place when the language changes.
    */
   function quoteKeys() {
     return Object.keys(TM.locales.en).filter(function (k) {
-      return /^intro\.quote\.\d+$/.test(k);
+      return /^quote\.\d+$/.test(k);
     });
   }
 
@@ -55,8 +55,8 @@
     return pool[Math.floor((random || Math.random)() * pool.length)];
   }
 
-  function initIntroQuote() {
-    var el = document.getElementById("intro-quote");
+  function initQuote() {
+    var el = document.querySelector("[data-quote]");
     if (!el) return;
     var last = null;
     try {
@@ -339,13 +339,11 @@
     TM.i18n.onChange(initFooter);
     initHeader();
     initFooter();
-    // Static sections (e.g. the homepage intro) also fade in on scroll.
+    initQuote();
+    // Static elements marked .reveal also fade in on scroll.
     TM.ui.reveal(document);
     var page = document.body.getAttribute("data-page");
-    if (page === "home") {
-      initIntroQuote();
-      initHome();
-    }
+    if (page === "home") initHome();
     if (page === "place") initPlace();
   });
 })();

@@ -59,13 +59,13 @@ test("mock content respects storage invariants", () => {
   }
 });
 
-test("there are at least 20 intro quotes, each with an emphasised word in both languages", () => {
+test("there are at least 20 quotes, each with an emphasised word in both languages", () => {
   const keys = Array.from(TM.quotes.keys());
   assert.ok(keys.length >= 20, `only ${keys.length} quotes`);
   for (const k of keys) for (const lang of ["en", "fr"]) assert.match(TM.locales[lang][k], /<em>[^<]+<\/em>/, `${lang} ${k}`);
 });
 
-test("the intro quote never repeats the previous visit's quote", () => {
+test("the quote never repeats the previous visit's quote", () => {
   const keys = TM.quotes.keys();
   for (const last of keys)
     for (const r of [0, 0.5, 0.999]) assert.notEqual(TM.quotes.pick(keys, last, () => r), last);
