@@ -37,12 +37,12 @@ Static Assets serves clean URLs. For example, `/place.html?slug=rome` redirects 
 | | Local | Staging | Production |
 | --- | --- | --- | --- |
 | Branch | — | `develop` | `main` |
-| Worker | `travel-memories` (local only) | `travel-memories-staging` | `travel-memories-production` |
+| Worker | `travel-memories-dev` (local only, never deployed) | `travel-memories-staging` | `travel-memories` |
 | R2 bucket (`STORAGE` binding) | `travel-memories-dev` (simulated) | `travel-memories-staging` | `travel-memories-production` |
 | `ENVIRONMENT` var | `development` | `staging` | `production` |
-| URL | localhost:8787 | `https://travel-memories-staging.<subdomain>.workers.dev` | `https://travel-memories-production.<subdomain>.workers.dev` |
+| URL | localhost:8787 | https://travel-memories-staging.adovene.workers.dev | https://travel-memories.adovene.workers.dev |
 
-Each R2 bucket holds both `content/` (JSON) and `media/` (originals), using the layout in the specification. All configuration lives in [wrangler.toml](wrangler.toml). In Wrangler, bindings and vars are **not inherited** by environments, so each environment declares its own. `npm run check` fails if staging and production ever share a Worker name or a bucket.
+Each R2 bucket holds both `content/` (JSON) and `media/` (originals), using the layout in the specification. All configuration lives in [wrangler.toml](wrangler.toml). In Wrangler, bindings and vars are **not inherited** by environments, so each environment declares its own. `npm run check` fails if staging and production ever share a Worker name or a bucket, or if the local config uses a deployed Worker's name. That last check matters because a plain `wrangler deploy` with no `--env` uses the local config, so it can never overwrite production.
 
 ## Deployment (GitHub Actions)
 

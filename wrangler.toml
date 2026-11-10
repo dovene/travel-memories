@@ -4,13 +4,16 @@
 # Three configurations:
 #   (top level)        local development via `npm run dev` (R2 is simulated locally)
 #   [env.staging]      deployed from the `develop` branch  -> travel-memories-staging
-#   [env.production]   deployed from the `main` branch     -> travel-memories-production
+#   [env.production]   deployed from the `main` branch     -> travel-memories
+#
+# The top-level name must never equal the production name: a plain `wrangler deploy`
+# (no --env) would otherwise overwrite production with development settings.
 #
 # Bindings and vars are NOT inherited by environments, so each env declares its own.
 # Runtime secrets (e.g. the admin password hash, session key) are set with
 # `wrangler secret put <NAME> --env <env>` and never committed.
 
-name = "travel-memories"
+name = "travel-memories-dev"
 main = "src/index.js"
 compatibility_date = "2026-10-15"
 workers_dev = true
@@ -47,7 +50,7 @@ bucket_name = "travel-memories-staging"
 
 # ------------------------------------------------------------- production
 [env.production]
-name = "travel-memories-production"
+name = "travel-memories"
 
 [env.production.vars]
 ENVIRONMENT = "production"

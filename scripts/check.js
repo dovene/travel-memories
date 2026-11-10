@@ -86,6 +86,15 @@ if (envs.staging && envs.production) {
   if (envs.staging.worker === envs.production.worker) fail("Staging and production share a Worker name");
   if (envs.staging.bucket === envs.production.bucket) fail("Staging and production share an R2 bucket");
 }
+// A plain `wrangler deploy` (no --env) uses the top-level config; it must not target a deployed Worker.
+const topLevel = toml.split(/^\s*\[/m)[0];
+const topName = (topLevel.match(/^name\s*=\s*"([^"]+)"/m) || [])[1];
+const topBucket = (toml.match(/^\[\[r2_buckets\]\][^[]*bucket_name\s*=\s*"([^"]+)"/m) || [])[1];
+for (const name of ["staging", "production"]) {
+  if (!envs[name]) continue;
+  if (topName && topName === envs[name].worker) fail(`Top-level Worker name "${topName}" collides with [env.${name}]`);
+  if (topBucket && topBucket === envs[name].bucket) fail(`Top-level R2 bucket "${topBucket}" collides with [env.${name}]`);
+}
 
 // 4. Secrets in frontend code
 const secretPatterns = [/api[_-]?token\s*[:=]\s*["'][^"']{12,}/i, /password\s*[:=]\s*["'][^"']+["']/i, /secret\s*[:=]\s*["'][^"']{8,}/i, /BEGIN [A-Z ]*PRIVATE KEY/];
