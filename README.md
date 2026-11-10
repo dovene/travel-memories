@@ -10,7 +10,15 @@ One Cloudflare Worker serves the static frontend (`public/`) and the API (`/api/
 | 2 — Content storage and API | ✅ Done 2026-11-10 |
 | 3 — Authentication and administration | ✅ Done 2026-11-10 |
 | 4 — Public experience | ✅ Done 2026-11-10 (plus the continuous place journey) |
-| 5 — Quality and production readiness | 🔧 Built: export/restore, security headers, accessibility fixes, device and security checks |
+| 5 — Quality and production readiness | ✅ Done 2026-11-10: export/restore, security headers, accessibility fixes, device and security checks |
+
+**Current release: [v1.0.0](https://github.com/dovene/travel-memories/releases/tag/v1.0.0)** (2026-11-10). It is the first production release, and every phase of the specification is live.
+
+### Possible next steps
+
+- Editable photo descriptions (alt text) in the admin. They currently come from file names.
+- A regular backup routine with `npm run export`, keeping copies outside Cloudflare.
+- Replacing the throwaway admin passwords with `npm run setup:admin -- --env <env>`.
 
 ## Local development
 
