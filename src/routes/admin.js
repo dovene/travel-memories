@@ -14,14 +14,16 @@
  *   DELETE /api/admin/places/:id/media/:mediaId
  *   PUT    /api/admin/places/:id/media/order      { order: [mediaId, ...] }
  *   PUT    /api/admin/places/:id/media/cover      { mediaId }
+ *   PUT    /api/admin/places/:id/media/:mediaId/variants/:name   preview image (thumb|display|poster)
  */
 import { ApiError, json, methodNotAllowed, SECURITY_HEADERS } from "../utils/responses.js";
 import { ContentStore } from "../services/storage.js";
 import {
-  addMedia, assertCanAddMedia, createPlace, deletePlace, listPlaces, removeMedia, reorderMedia, setCover, updatePlace,
+  addMedia, assertCanAddMedia, assertMediaExists, createPlace, deletePlace, listPlaces, removeMedia, reorderMedia, setCover,
+  setVariant, updatePlace,
 } from "../services/places.js";
 import { authenticate, clearedSessionCookie, createSessionToken, isConfigured, sessionCookie } from "../services/auth.js";
-import { MAX_MEDIA_PER_PLACE, storeUpload } from "../services/uploads.js";
+import { MAX_MEDIA_PER_PLACE, storeUpload, storeVariant } from "../services/uploads.js";
 import { mediaBaseUrl, presentPlace } from "./public.js";
 
 const MAX_BODY_BYTES = 64 * 1024;
@@ -92,7 +94,7 @@ function logout(request) {
 }
 
 export async function handleAdmin(request, env, segments, { getSession }) {
-  const [resource, id, sub, subId, extra] = segments;
+  const [resource, id, sub, subId, extra, variantName, beyond] = segments;
 
   if (resource === "login" && id === undefined) return login(request, env);
   if (resource === "logout" && id === undefined) return logout(request);
@@ -105,7 +107,7 @@ export async function handleAdmin(request, env, segments, { getSession }) {
 
   if (!session) throw new ApiError(401, "unauthorized", "Sign in to continue.");
   requireSameOrigin(request);
-  if (resource !== "places" || extra !== undefined) throw new ApiError(404, "not_found", "Resource not found.");
+  if (resource !== "places" || beyond !== undefined) throw new ApiError(404, "not_found", "Resource not found.");
 
   const ownerId = session.ownerId;
   const store = new ContentStore(env.STORAGE);
@@ -164,6 +166,20 @@ export async function handleAdmin(request, env, segments, { getSession }) {
       ? await reorderMedia(store, ownerId, id, body && body.order)
       : await setCover(store, ownerId, id, body && body.mediaId);
     return placeResponse(place);
+  }
+
+  /* /places/:id/media/:mediaId/variants/:name */
+  if (extra !== undefined) {
+    if (extra !== "variants" || variantName === undefined) throw new ApiError(404, "not_found", "Resource not found.");
+    if (request.method !== "PUT") return methodNotAllowed(["PUT"]);
+    await assertMediaExists(store, ownerId, id, subId);
+    const { key, variant } = await storeVariant(env.STORAGE, ownerId, id, subId, variantName, request);
+    try {
+      return placeResponse(await setVariant(store, ownerId, id, subId, variantName, variant));
+    } catch (e) {
+      await env.STORAGE.delete(key).catch(() => {});
+      throw e;
+    }
   }
 
   /* /places/:id/media/:mediaId */

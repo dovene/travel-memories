@@ -166,6 +166,29 @@ export async function addMedia(store, ownerId, placeId, media) {
   });
 }
 
+/* Attaches (or replaces) a preview variant; returns the place and the replaced file, if any. */
+export async function setVariant(store, ownerId, placeId, mediaId, name, variant) {
+  let replaced = null;
+  const place = await store.mutatePlaces(ownerId, (doc) => {
+    const p = findPlace(doc, placeId);
+    const m = p.media.find((x) => x.id === mediaId);
+    if (!m) throw new ApiError(404, "not_found", "Media not found.");
+    replaced = m.variants && m.variants[name] ? m.variants[name].filename : null;
+    m.variants = { ...(m.variants || {}), [name]: variant };
+    touch(p);
+    return p;
+  });
+  if (replaced && replaced !== variant.filename) await store.deleteMediaFile(ownerId, placeId, replaced);
+  return place;
+}
+
+/* Fails before reading a preview upload when the media item does not exist. */
+export async function assertMediaExists(store, ownerId, placeId, mediaId) {
+  const { data } = await store.getPlaces(ownerId);
+  const place = findPlace(data, placeId);
+  if (!place.media.some((m) => m.id === mediaId)) throw new ApiError(404, "not_found", "Media not found.");
+}
+
 export async function removeMedia(store, ownerId, placeId, mediaId) {
   let removed;
   const place = await store.mutatePlaces(ownerId, (doc) => {
@@ -178,8 +201,9 @@ export async function removeMedia(store, ownerId, placeId, mediaId) {
     touch(p);
     return p;
   });
-  // The file is deleted only once nothing references it.
+  // Files are deleted only once nothing references them: the original and its previews.
   await store.deleteMediaFile(ownerId, placeId, removed.filename);
+  for (const v of Object.values(removed.variants || {})) await store.deleteMediaFile(ownerId, placeId, v.filename);
   return place;
 }
 

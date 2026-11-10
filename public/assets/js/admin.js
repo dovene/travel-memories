@@ -47,6 +47,7 @@
   }
 
   var places = [];
+  var queue = Promise.resolve(); // uploads and preview jobs run one after another
   var current = null; // server copy of the selected place (null = new destination)
   var draft = null;   // locally edited text fields
   var dirty = false;
@@ -64,9 +65,10 @@
     this.details = body && body.error && body.error.details;
   }
 
-  function request(method, path, body, headers) {
+  function request(method, path, body, headers, rawBody) {
     var init = { method: method, credentials: "same-origin", headers: headers || {} };
-    if (body !== undefined) {
+    if (rawBody !== undefined) init.body = rawBody;
+    else if (body !== undefined) {
       init.body = JSON.stringify(body);
       init.headers["Content-Type"] = "application/json";
     }
@@ -123,6 +125,13 @@
     if (current && current.id === place.id) current = place;
   }
 
+  /* Best available small image for a media item (null for a video without poster). */
+  function previewUrl(m, size) {
+    var v = m.variants || {};
+    if (m.type === "video") return v.poster ? v.poster.url : null;
+    return (v[size] || v.thumb || v.display || m).url;
+  }
+
   function coverOf(place) {
     return place.media.filter(function (m) {
       return m.id === place.coverMediaId;
@@ -135,7 +144,8 @@
       ? places
           .map(function (p) {
             var c = coverOf(p);
-            var thumb = c && c.type === "image" ? '<img alt="" loading="lazy" src="' + esc(c.url) + '">' : '<span class="ph">' + (c ? I.video : I.image) + "</span>";
+            var src = c && previewUrl(c, "thumb");
+            var thumb = src ? '<img alt="" loading="lazy" src="' + esc(src) + '">' : '<span class="ph">' + (c ? I.video : I.image) + "</span>";
             return (
               '<li><button type="button" class="dest-item" data-id="' + esc(p.id) + '" aria-current="' + Boolean(current && p.id === current.id) + '">' +
               thumb +
@@ -172,6 +182,7 @@
     renderList();
     setDirty(false);
     closeSide();
+    if (place) backfillPreviews(place);
   }
 
   function renderTabs() {
@@ -339,10 +350,13 @@
       .map(function (m, i) {
         var isCover = m.id === current.coverMediaId;
         var name = TM.i18n.pick(m.altText) || m.originalFilename || "Media " + (i + 1);
+        var poster = m.variants && m.variants.poster;
         var visual =
           m.type === "video"
-            ? '<video muted playsinline preload="metadata" src="' + esc(m.url) + '#t=0.5"></video>'
-            : '<img alt="" loading="lazy" decoding="async" src="' + esc(m.url) + '">';
+            ? poster
+              ? '<img alt="" loading="lazy" decoding="async" src="' + esc(poster.url) + '">'
+              : '<video muted playsinline preload="metadata" src="' + esc(m.url) + '#t=0.5"></video>'
+            : '<img alt="" loading="lazy" decoding="async" src="' + esc(previewUrl(m, "thumb")) + '">';
         return (
           '<div class="mm-item' + (isCover ? " is-cover" : "") + '" data-id="' + esc(m.id) + '">' +
           visual +
@@ -495,6 +509,149 @@
     window.addEventListener("pointercancel", endDrag);
   }
 
+  /* ---------- previews ----------
+   * Smaller copies made in the browser after upload (originals are never changed):
+   *   photos → thumb (640 px) and display (2048 px); videos → poster (1600 px still frame).
+   * Formats the browser cannot decode (e.g. HEIC outside Safari) keep their original only.
+   */
+  var PREVIEW_SIZES = { thumb: 640, display: 2048, poster: 1600 };
+
+  function scaleTo(source, sw, sh, maxSide) {
+    var ratio = Math.min(1, maxSide / Math.max(sw, sh));
+    var tw = Math.max(1, Math.round(sw * ratio));
+    var th = Math.max(1, Math.round(sh * ratio));
+    // Halve in steps for smooth downscaling, then draw at the exact size.
+    var cur = source, cw = sw, ch = sh;
+    while (cw / 2 >= tw && ch / 2 >= th) {
+      var step = document.createElement("canvas");
+      step.width = Math.round(cw / 2);
+      step.height = Math.round(ch / 2);
+      var sx = step.getContext("2d");
+      sx.imageSmoothingQuality = "high";
+      sx.drawImage(cur, 0, 0, step.width, step.height);
+      cur = step;
+      cw = step.width;
+      ch = step.height;
+    }
+    var out = document.createElement("canvas");
+    out.width = tw;
+    out.height = th;
+    var ctx = out.getContext("2d");
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(cur, 0, 0, tw, th);
+    return new Promise(function (resolve) {
+      out.toBlob(function (blob) {
+        resolve(blob ? { blob: blob, width: tw, height: th } : null);
+      }, "image/jpeg", 0.84);
+    });
+  }
+
+  function decodeImage(blob) {
+    if (!window.createImageBitmap) return Promise.reject(new Error("unsupported"));
+    return createImageBitmap(blob, { imageOrientation: "from-image" }).catch(function () {
+      return createImageBitmap(blob);
+    });
+  }
+
+  function videoFrame(blob) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(blob);
+      var v = document.createElement("video");
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = "auto";
+      var cleanup = function () {
+        URL.revokeObjectURL(url);
+      };
+      v.onloadeddata = function () {
+        v.currentTime = Math.min(0.5, (v.duration || 1) / 3);
+      };
+      v.onseeked = function () {
+        resolve({ source: v, width: v.videoWidth, height: v.videoHeight, done: cleanup });
+      };
+      v.onerror = function () {
+        cleanup();
+        reject(new Error("unsupported"));
+      };
+      setTimeout(function () {
+        cleanup();
+        reject(new Error("timeout"));
+      }, 15000);
+      v.src = url;
+    });
+  }
+
+  function sendPreview(placeId, mediaId, name, result) {
+    return request(
+      "PUT",
+      "/places/" + encodeURIComponent(placeId) + "/media/" + encodeURIComponent(mediaId) + "/variants/" + name,
+      undefined,
+      { "Content-Type": "image/jpeg", "X-Media-Width": String(result.width), "X-Media-Height": String(result.height) },
+      result.blob
+    );
+  }
+
+  /* Creates and uploads the missing previews of one media item; resolves with the latest place. */
+  function makePreviews(placeId, media, blob) {
+    var have = media.variants || {};
+    var wanted = media.type === "video" ? ["poster"] : ["thumb", "display"];
+    var missing = wanted.filter(function (n) {
+      return !have[n];
+    });
+    if (!missing.length) return Promise.resolve(null);
+    var source = media.type === "video" ? videoFrame(blob) : decodeImage(blob).then(function (bmp) {
+      return { source: bmp, width: bmp.width, height: bmp.height, done: function () { bmp.close && bmp.close(); } };
+    });
+    return source.then(function (src) {
+      var latest = null;
+      return missing
+        .reduce(function (chain, name) {
+          return chain.then(function () {
+            return scaleTo(src.source, src.width, src.height, PREVIEW_SIZES[name]).then(function (result) {
+              if (!result) return;
+              return sendPreview(placeId, media.id, name, result).then(function (place) {
+                latest = place;
+              });
+            });
+          });
+        }, Promise.resolve())
+        .then(function () {
+          src.done();
+          return latest;
+        });
+    });
+  }
+
+  /* Older uploads without previews get them in the background when their destination is opened. */
+  var attempted = {};
+  function backfillPreviews(place) {
+    place.media.forEach(function (m) {
+      var needs = m.type === "video" ? !(m.variants && m.variants.poster) : !(m.variants && m.variants.thumb && m.variants.display);
+      if (!needs || attempted[m.id]) return;
+      attempted[m.id] = true;
+      queue = queue.then(function () {
+        return fetch(m.url, { credentials: "same-origin" })
+          .then(function (res) {
+            if (!res.ok) throw new Error("download failed");
+            return res.blob();
+          })
+          .then(function (blob) {
+            return makePreviews(place.id, m, blob);
+          })
+          .then(function (updated) {
+            if (updated) {
+              replacePlace(updated);
+              if (current && current.id === updated.id) renderMedia();
+              renderList();
+            }
+          })
+          .catch(function () {
+            /* undecodable format: the original stays in use */
+          });
+      });
+    });
+  }
+
   /* ---------- uploads ---------- */
   function classify(file) {
     var ext = (file.name.split(".").pop() || "").toLowerCase();
@@ -570,8 +727,6 @@
     });
   }
 
-  var queue = Promise.resolve();
-
   function upload(files) {
     if (!current) return;
     var placeId = current.id;
@@ -597,6 +752,12 @@
 
       // One upload at a time keeps the place version predictable and the connection free.
       queue = queue.then(function () {
+        var before = {};
+        (places.filter(function (p) {
+          return p.id === placeId;
+        })[0] || { media: [] }).media.forEach(function (m) {
+          before[m.id] = true;
+        });
         return dimensions(file, check.kind)
           .then(function (size) {
             return send(placeId, file, check.type, size, function (p) {
@@ -608,6 +769,24 @@
             replacePlace(place);
             if (current && current.id === place.id) renderMedia();
             renderList();
+            var added = place.media.filter(function (m) {
+              return !before[m.id];
+            })[0];
+            if (!added) return place;
+            sub.textContent = fmtSize(file.size) + " · Creating previews…";
+            return makePreviews(place.id, added, file)
+              .catch(function () {
+                return null; // e.g. HEIC in a browser that cannot decode it: the original is used
+              })
+              .then(function (updated) {
+                if (updated) {
+                  replacePlace(updated);
+                  if (current && current.id === updated.id) renderMedia();
+                  renderList();
+                }
+              });
+          })
+          .then(function () {
             row.classList.add("is-done");
             bar.style.width = "100%";
             sub.textContent = fmtSize(file.size) + " · Uploaded";
@@ -688,6 +867,13 @@
       })[0];
       load(p);
       window.scrollTo({ top: 0, behavior: "smooth" });
+      // Refresh from the server: another tab or device may have changed it since the list loaded.
+      request("GET", "/places/" + encodeURIComponent(p.id))
+        .then(function (fresh) {
+          replacePlace(fresh);
+          if (current && current.id === fresh.id && !dirty) load(fresh);
+        })
+        .catch(failed);
     });
 
     var dlg = $("confirm-delete");

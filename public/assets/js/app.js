@@ -79,16 +79,34 @@
     var dotsEl = document.querySelector(".hero-dots");
     var labelEl = document.querySelector("[data-hero-place]");
     if (!slidesEl) return;
-    var slides = TM.api.heroSlides();
+
+    var countries = TM.filters.countries(places).length;
+    var moments = places.reduce(function (n, p) {
+      return n + p.media.length;
+    }, 0);
+    document.querySelector("[data-stat=places]").textContent = places.length;
+    document.querySelector("[data-stat=countries]").textContent = countries;
+    document.querySelector("[data-stat=moments]").textContent = moments;
+
+    var slides = TM.api.heroSlides(places);
     var current = 0;
     var timer = null;
+
+    /* No photos published yet: keep the hero as a calm brand gradient. */
+    var hero = document.querySelector(".hero");
+    hero.classList.toggle("is-plain", !slides.length);
+    if (!slides.length) {
+      slidesEl.innerHTML = "";
+      document.querySelector(".hero-caption").hidden = true;
+      return;
+    }
 
     slidesEl.innerHTML = slides
       .map(function (s, i) {
         return (
           '<div class="hero-slide' + (i === 0 ? " is-active" : "") + '">' +
-          '<img alt="" ' + (i === 0 ? 'fetchpriority="high"' : 'loading="lazy"') + ' src="' + esc(TM.api.mediaUrl(s.media, 2000, 1250)) + '" ' +
-          'srcset="' + esc(TM.api.mediaUrl(s.media, 900, 1300) + " 900w, " + TM.api.mediaUrl(s.media, 1400, 1100) + " 1400w, " + TM.api.mediaUrl(s.media, 2000, 1250) + " 2000w") + '" sizes="100vw">' +
+          '<img alt="" ' + (i === 0 ? 'fetchpriority="high"' : 'loading="lazy"') + ' src="' + esc(s.image.src) + '"' +
+          (s.image.srcset ? ' srcset="' + esc(s.image.srcset) + '" sizes="100vw"' : "") + ">" +
           "</div>"
         );
       })
@@ -137,14 +155,6 @@
     TM.i18n.onChange(renderDots);
     renderDots();
     start();
-
-    var countries = TM.filters.countries(places).length;
-    var moments = places.reduce(function (n, p) {
-      return n + p.media.length;
-    }, 0);
-    document.querySelector("[data-stat=places]").textContent = places.length;
-    document.querySelector("[data-stat=countries]").textContent = countries;
-    document.querySelector("[data-stat=moments]").textContent = moments;
   }
 
   function initHome() {
@@ -245,12 +255,28 @@
       render();
     });
 
-    TM.api.getPlaces().then(function (places) {
-      all = places;
-      initHero(places);
-      renderChips();
-      render();
-    });
+    TM.api
+      .getPlaces()
+      .then(function (places) {
+        all = places;
+        initHero(places);
+        renderChips();
+        render();
+      })
+      .catch(function () {
+        initHero([]);
+        meta.textContent = "";
+        grid.innerHTML = loadError();
+      });
+  }
+
+  /* Shown when the content API cannot be reached; the button simply reloads the page. */
+  function loadError() {
+    return (
+      '<div class="empty" style="column-span:all">' + TM.icons.compass +
+      "<h3>" + esc(t("errors.loadTitle")) + "</h3><p>" + esc(t("errors.loadText")) + "</p>" +
+      '<button type="button" class="btn btn-primary" onclick="location.reload()">' + esc(t("errors.retry")) + "</button></div>"
+    );
   }
 
   /* ---------- Place detail ---------- */
@@ -273,19 +299,25 @@
       }
       var p = current;
       var c = TM.api.cover(p);
+      var heroImg = TM.api.coverImage(p, "display");
+      var nextImg = nextPlace && TM.api.coverImage(nextPlace, "display");
       var photos = p.media.filter(function (m) {
         return m.type === "image";
       }).length;
       var videos = p.media.length - photos;
       document.title = pick(p.name) + " — Travel Memories";
 
-      var mediaCount = [photos === 1 ? t("card.photo") : t("card.photos", { n: photos })];
+      var mediaCount = [];
+      if (photos) mediaCount.push(photos === 1 ? t("card.photo") : t("card.photos", { n: photos }));
       if (videos) mediaCount.push(videos === 1 ? t("card.video") : t("card.videos", { n: videos }));
+      if (!mediaCount.length) mediaCount.push(t("card.soon"));
 
       main.innerHTML =
-        '<section class="place-hero">' +
-        '<img alt="' + esc(pick(c.altText)) + '" fetchpriority="high" src="' + esc(TM.api.mediaUrl(c, 2000, 1250)) + '" srcset="' +
-        esc(TM.api.mediaUrl(c, 900, 1300) + " 900w, " + TM.api.mediaUrl(c, 1400, 1000) + " 1400w, " + TM.api.mediaUrl(c, 2000, 1250) + " 2000w") + '" sizes="100vw">' +
+        '<section class="place-hero' + (heroImg ? "" : " is-plain") + '">' +
+        (heroImg
+          ? '<img alt="' + esc(pick(c.altText)) + '" fetchpriority="high" src="' + esc(heroImg.src) + '"' +
+            (heroImg.srcset ? ' srcset="' + esc(heroImg.srcset) + '" sizes="100vw"' : "") + ">"
+          : "") +
         '<div class="container place-hero-content hero-enter">' +
         '<a class="back-link" href="index.html#destinations">' + TM.icons.arrowLeft + esc(t("place.back")) + "</a>" +
         '<p class="eyebrow">' + esc(p.city) + " · " + esc(pick(p.country)) + "</p>" +
@@ -297,40 +329,48 @@
         '<dl class="place-facts reveal">' +
         "<div><dt>" + esc(t("place.city")) + "</dt><dd>" + esc(p.city) + "</dd></div>" +
         "<div><dt>" + esc(t("place.country")) + "</dt><dd>" + esc(pick(p.country)) + "</dd></div>" +
-        "<div><dt>" + esc(t("place.visited")) + "</dt><dd>" + esc(TM.i18n.formatMonth(p.visitedAt)) + "</dd></div>" +
+        (p.visitedAt ? "<div><dt>" + esc(t("place.visited")) + "</dt><dd>" + esc(TM.i18n.formatMonth(p.visitedAt)) + "</dd></div>" : "") +
         "<div><dt>" + esc(t("place.media")) + "</dt><dd>" + esc(mediaCount.join(" · ")) + "</dd></div>" +
         "</dl></section>" +
         '<section aria-labelledby="gallery-title">' +
-        '<div class="gallery-head"><h2 id="gallery-title">' + esc(t("place.gallery")) + "</h2><p>" + esc(t("place.galleryHint")) + "</p></div>" +
-        '<div class="media-grid" id="media-grid"></div>' +
+        '<div class="gallery-head"><h2 id="gallery-title">' + esc(t("place.gallery")) + "</h2>" +
+        (p.media.length ? "<p>" + esc(t("place.galleryHint")) + "</p>" : "") + "</div>" +
+        (p.media.length
+          ? '<div class="media-grid" id="media-grid"></div>'
+          : '<div class="empty" style="margin-bottom:var(--space-8)">' + TM.icons.camera + "<h3>" + esc(t("place.noMediaTitle")) + "</h3><p>" + esc(t("place.noMediaText")) + "</p></div>") +
         "</section></div>" +
         (nextPlace
           ? '<a class="next-place" href="' + TM.ui.placeHref(nextPlace) + '">' +
-            '<img alt="" loading="lazy" src="' + esc(TM.api.mediaUrl(TM.api.cover(nextPlace), 1800, 900)) + '">' +
+            (nextImg ? '<img alt="" loading="lazy" src="' + esc(nextImg.src) + '">' : "") +
             '<div class="container"><div><p class="eyebrow">' + esc(t("place.next")) + "</p><h2>" + esc(pick(nextPlace.name)) + "</h2></div>" +
             '<span class="btn btn-light">' + esc(t("place.nextCta")) + TM.icons.arrowRight + "</span></div></a>"
           : "");
 
-      TM.ui.renderMediaGrid(document.getElementById("media-grid"), p, function (i, el) {
-        TM.lightbox.open(p, i, el);
-      });
+      if (p.media.length) {
+        TM.ui.renderMediaGrid(document.getElementById("media-grid"), p, function (i, el) {
+          TM.lightbox.open(p, i, el);
+        });
+      }
       TM.ui.reveal(main);
     }
 
     TM.i18n.onChange(render);
 
-    Promise.all([TM.api.getPlace(slug), TM.api.getPlaces()]).then(function (res) {
-      current = res[0];
-      var list = res[1];
-      if (current) {
+    // One request gives both this destination and the next one to suggest.
+    TM.api
+      .getPlaces()
+      .then(function (list) {
         var i = list.findIndex(function (x) {
-          return x.slug === current.slug;
+          return x.slug === slug;
         });
-        nextPlace = list[(i + 1) % list.length];
-      }
-      main.classList.remove("shimmer");
-      render();
-    });
+        current = i === -1 ? null : list[i];
+        nextPlace = current && list.length > 1 ? list[(i + 1) % list.length] : null;
+        render();
+      })
+      .catch(function () {
+        document.querySelector(".site-header").classList.add("is-solid");
+        main.innerHTML = '<section class="section"><div class="container" style="padding-top:var(--header-h)">' + loadError() + "</div></section>";
+      });
   }
 
   document.addEventListener("DOMContentLoaded", function () {

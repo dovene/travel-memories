@@ -1,10 +1,9 @@
 /*
- * Content API client.
+ * Public content client for /api/public/:username/*.
  *
- * Phase 0: resolves against in-memory mock data with a small artificial delay
- * so loading states can be reviewed. The method names mirror the planned
- * public endpoints (GET /api/public/:username/...) so the UI code will not
- * change when the Worker API arrives.
+ * Media come with generated URLs: `url` is the original file, and `variants.thumb`,
+ * `variants.display` and `variants.poster` are smaller copies when they exist.
+ * Helpers below always pick the lightest version that fits, falling back to the original.
  */
 (function () {
   "use strict";
@@ -12,22 +11,24 @@
   var TM = (window.TM = window.TM || {});
 
   var config = {
-    username: "dovene",
-    /* Production: media URLs are generated from a configurable base URL,
-       e.g. "/api/public/{username}/media/{mediaId}". */
-    mediaBaseUrl: "https://images.unsplash.com/photo-",
-    latency: 450
+    /* The journal shown by this site. A <html data-username="…"> attribute can override it. */
+    username: document.documentElement.getAttribute("data-username") || "dovene"
   };
 
-  function clone(v) {
-    return JSON.parse(JSON.stringify(v));
+  function base() {
+    return "/api/public/" + encodeURIComponent(config.username);
   }
 
-  function delay(value) {
-    return new Promise(function (resolve) {
-      setTimeout(function () {
-        resolve(clone(value));
-      }, config.latency);
+  function ApiError(status, message) {
+    this.status = status;
+    this.message = message;
+  }
+
+  function getJson(path) {
+    return fetch(base() + path, { headers: { Accept: "application/json" } }).then(function (res) {
+      if (res.status === 404) return null;
+      if (!res.ok) throw new ApiError(res.status, "Request failed");
+      return res.json();
     });
   }
 
@@ -38,74 +39,84 @@
     return place;
   }
 
-  function allPlaces() {
-    return TM.mock.places.places.map(sortMedia);
+  /* ---------- media helpers ---------- */
+
+  function variant(m, name) {
+    return m && m.variants && m.variants[name] ? m.variants[name] : null;
   }
 
-  /* Build a URL for a media item at a given display width. */
-  function mediaUrl(media, width, height) {
-    if (media.type === "video") return media.filename;
-    if (/^(https?:|blob:|data:)/.test(media.filename)) return media.filename;
-    var w = width || 1200;
-    var h = height || Math.round((w * media.height) / media.width);
-    return config.mediaBaseUrl + media.filename + "?auto=format&fit=crop&q=78&w=" + w + "&h=" + h;
+  /* { src, srcset, width, height } for showing a photo (or a video's poster) at a given size. */
+  function image(m, size) {
+    if (!m) return null;
+    if (m.type === "video") {
+      var poster = variant(m, "poster");
+      return poster ? { src: poster.url, srcset: "", width: poster.width, height: poster.height } : null;
+    }
+    var thumb = variant(m, "thumb");
+    var display = variant(m, "display");
+    var parts = [];
+    if (thumb) parts.push(thumb.url + " " + thumb.width + "w");
+    if (display) parts.push(display.url + " " + display.width + "w");
+    var preferred = size === "thumb" ? thumb || display : display || thumb;
+    return {
+      src: preferred ? preferred.url : m.url,
+      srcset: parts.length > 1 ? parts.join(", ") : "",
+      width: m.width || (preferred && preferred.width),
+      height: m.height || (preferred && preferred.height)
+    };
   }
 
-  function srcset(media, widths) {
-    if (media.type === "video" || /^(blob:|data:)/.test(media.filename)) return "";
-    return (widths || [400, 640, 900, 1280, 1800])
-      .map(function (w) {
-        return mediaUrl(media, w) + " " + w + "w";
-      })
-      .join(", ");
+  function ratio(m) {
+    var w = m && (m.width || (variant(m, "poster") || variant(m, "display") || {}).width);
+    var h = m && (m.height || (variant(m, "poster") || variant(m, "display") || {}).height);
+    return w && h ? w + " / " + h : "4 / 3";
   }
 
   function cover(place) {
-    var found = place.media.filter(function (m) {
-      return m.id === place.coverMediaId;
-    })[0];
-    return found || place.media[0];
+    if (!place || !place.media.length) return null;
+    return (
+      place.media.filter(function (m) {
+        return m.id === place.coverMediaId;
+      })[0] || place.media[0]
+    );
   }
 
-  /* Poster image for a video tile: the place cover. */
-  function poster(place) {
-    var c = cover(place);
-    return c && c.type === "image" ? mediaUrl(c, 900) : "";
+  /* A cover that can be shown as a picture (photo, or video with a poster). */
+  function coverImage(place, size) {
+    return image(cover(place), size);
+  }
+
+  /* Up to four destinations with a picture cover, for the homepage hero. */
+  function heroSlides(places) {
+    return places
+      .filter(function (p) {
+        return coverImage(p, "display");
+      })
+      .slice(0, 4)
+      .map(function (p) {
+        return { place: p, image: coverImage(p, "display") };
+      });
   }
 
   TM.api = {
     config: config,
-    mediaUrl: mediaUrl,
-    srcset: srcset,
+    image: image,
+    ratio: ratio,
     cover: cover,
-    poster: poster,
+    coverImage: coverImage,
+    heroSlides: heroSlides,
     getProfile: function () {
-      return delay(TM.mock.profile);
+      return getJson("/profile");
     },
     getPlaces: function () {
-      return delay(allPlaces());
+      return getJson("/places").then(function (data) {
+        return data ? data.places.map(sortMedia) : [];
+      });
     },
     getPlace: function (slug) {
-      var p = allPlaces().filter(function (x) {
-        return x.slug === slug;
-      })[0];
-      return p ? delay(p) : delay(null);
-    },
-    /* Synchronous access for the admin mockup only. */
-    _placesSync: allPlaces,
-    heroSlides: function () {
-      var places = allPlaces();
-      return TM.mock.heroSlides
-        .map(function (s) {
-          var p = places.filter(function (x) {
-            return x.slug === s.slug;
-          })[0];
-          var m = p && p.media.filter(function (x) {
-            return x.id === s.mediaId;
-          })[0];
-          return p && m ? { place: p, media: m } : null;
-        })
-        .filter(Boolean);
+      return getJson("/places/" + encodeURIComponent(slug)).then(function (p) {
+        return p ? sortMedia(p) : null;
+      });
     }
   };
 })();

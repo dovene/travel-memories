@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /*
  * Seeds a bucket with a starter journal: the owner's username index, profile and places
- * (taken from the Phase 0 mock destinations, without media — photos arrive with uploads).
+ * (the starter destinations in scripts/fixtures/starter-content.js, without media — photos arrive with uploads).
  *
  *   node scripts/seed-content.js --target local                 # Wrangler's local R2 (npm run dev)
  *   node scripts/seed-content.js --target staging               # needs `npx wrangler login`
@@ -35,7 +35,7 @@ const root = new URL("..", import.meta.url).pathname;
 
 /* Load the mock destinations the same way the browser does. */
 const ctx = { window: {} };
-vm.runInNewContext(readFileSync(join(root, "public/assets/js/data/mock-content.js"), "utf8"), ctx);
+vm.runInNewContext(readFileSync(join(root, "scripts/fixtures/starter-content.js"), "utf8"), ctx);
 const mock = ctx.window.TM.mock;
 
 const now = new Date().toISOString().replace(/\.\d+Z$/, "Z");

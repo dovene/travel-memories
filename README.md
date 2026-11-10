@@ -8,8 +8,9 @@ One Cloudflare Worker serves the static frontend (`public/`) and the API (`/api/
 | 0 — Design prototype | ✅ Approved 2026-11-10 |
 | 1 — Project foundation | ✅ Done 2026-11-10: staging and production deploy from `develop` and `main` |
 | 2 — Content storage and API | ✅ Done 2026-11-10 |
-| 3 — Authentication and administration | 🔧 Built: admin login, secure sessions, working editor, media upload/remove/reorder/cover |
-| 4–5 | Not started |
+| 3 — Authentication and administration | ✅ Done 2026-11-10 |
+| 4 — Public experience | 🔧 Built: public site reads the real API, image previews, empty and error states |
+| 5 | Not started |
 
 ## Local development
 
@@ -68,7 +69,21 @@ Files go through the Worker straight into R2 and are kept as original, unmodifie
 - the file's actual signature ("magic bytes") matches its type;
 - the size is within the limit: 25 MB per photo, 95 MB per video.
 
-Allowed types are JPG, PNG, WEBP, HEIC, AVIF, MP4, MOV and WEBM. The size limits come from Cloudflare's 100 MB request limit on the free plan. Larger videos would need direct uploads to R2 with presigned URLs, which the spec lists as a later option. The first upload becomes the cover. Removing an item deletes its file, and deleting a destination deletes its folder.
+Allowed types are JPG, PNG, WEBP, HEIC, AVIF, MP4, MOV and WEBM.
+
+### Previews
+
+Originals can be several megabytes, so the public site never shows them in grids. After each upload, the admin page creates smaller JPEG copies in your browser:
+
+| Preview | Size | Used for |
+| --- | --- | --- |
+| `thumb` | up to 640 px | Cards, gallery tiles, viewer thumbnails |
+| `display` | up to 2048 px | Hero, place cover, fullscreen viewer |
+| `poster` | up to 1600 px | Still frame shown before a video plays |
+
+The server checks previews exactly like originals (type, signature, size, pixel dimensions). It stores them next to the original as `<mediaId>.<preview>-<token>.jpg`, and lists them under `variants` in `places.json`. The original is never modified. Previews can always be regenerated from it, and opening a destination in the admin fills in any that are missing.
+
+A photo without previews falls back to its original. HEIC photos only get previews when uploaded from Safari, because other browsers can't decode HEIC. The size limits come from Cloudflare's 100 MB request limit on the free plan. Larger videos would need direct uploads to R2 with presigned URLs, which the spec lists as a later option. The first upload becomes the cover. Removing an item deletes its file, and deleting a destination deletes its folder.
 
 ## Content model
 
@@ -103,7 +118,7 @@ Errors always look like `{ "error": { "code", "message", "details?" } }`. Valida
 | `GET /api/public/:username/profile` | Profile |
 | `GET /api/public/:username/places` | `{ places: [...] }` with media `url`s, ordered by position |
 | `GET /api/public/:username/places/:slug` | One place |
-| `GET /api/public/:username/media/:mediaId` | The original file. Supports `Range` (video seeking) and `If-None-Match`, and is cached long-term |
+| `GET /api/public/:username/media/:mediaId[?variant=thumb\|display\|poster]` | The original file, or a preview. Supports `Range` (video seeking) and `If-None-Match`, and is cached long-term |
 
 JSON responses carry an `ETag` and answer `304` when unchanged.
 
@@ -121,6 +136,7 @@ JSON responses carry an `ETag` and answer `304` when unchanged.
 | `DELETE /api/admin/places/:id/media/:mediaId` | Removes the item and its file |
 | `PUT /api/admin/places/:id/media/order` | `{ order: [ids] }`. It must list exactly the current media, otherwise `409` with `currentOrder` |
 | `PUT /api/admin/places/:id/media/cover` | `{ mediaId }` |
+| `PUT /api/admin/places/:id/media/:mediaId/variants/:name` | A preview (`thumb`, `display` or `poster`): raw JPEG/WEBP/PNG body with `X-Media-Width` and `X-Media-Height` |
 
 ### Seeding a bucket
 
@@ -191,7 +207,7 @@ Do these once. They need your own Cloudflare and GitHub accounts.
 public/                 Static frontend (served by Workers Static Assets)
   index.html, place.html, admin/
   assets/css/           main · components · gallery · admin
-  assets/js/            i18n/, data/ (mock content), api, filters, gallery, lightbox, app, admin
+  assets/js/            i18n/, api (public API client), filters, gallery, lightbox, app, admin
 schemas/                JSON Schemas for profile.json and places.json
 src/
   index.js              Worker entry. Only a default export is allowed (enforced by npm run check)
@@ -208,6 +224,7 @@ src/
 scripts/
   check.js              Static checks: syntax, EN/FR key parity, env isolation, secret scan, entry exports, schemas
   seed-content.js       Loads the starter journal into a bucket
+  fixtures/             Starter destinations used by the seed script and tests
   setup-admin.js        Sets the admin password hash and session key per environment
   smoke-test.js         Post-deploy health check
   serve.py              No-cache server for the Phase 0 prototype
@@ -216,7 +233,7 @@ tests/                  node:test suites: API, conflicts, owner isolation, valid
 wrangler.toml           Worker, assets, environments, R2 bindings
 ```
 
-## Prototype notes
+## Notes
 
-- The frontend still uses the Phase 0 mock data (`public/assets/js/data/mock-content.js`). Sample photos are hot-linked from Unsplash, and the sample video is MDN's CC0 `flower.mp4`. In Phase 4 it switches to the `/api/public/:username/*` endpoints, once real photos exist (uploads arrive in Phase 3).
-- Admin thumbnails load the original files. Resized previews are part of the later media optimisation work.
+- The public site reads `/api/public/dovene/*`. To show another journal, set `<html data-username="…">` (the future `/@username` URLs build on this).
+- Destinations without photos show a gradient placeholder, and the place page says "Photos coming soon". If the API can't be reached, the homepage and place pages show an error with a retry button.

@@ -59,11 +59,12 @@
   }
 
   function countLabel(place) {
+    if (!place.media.length) return "<span>" + TM.icons.camera + esc(t("card.soon")) + "</span>";
     var photos = place.media.filter(function (m) {
       return m.type === "image";
     }).length;
     var videos = place.media.length - photos;
-    var out = '<span>' + TM.icons.camera + (photos === 1 ? t("card.photo") : t("card.photos", { n: photos })) + "</span>";
+    var out = photos ? '<span>' + TM.icons.camera + (photos === 1 ? t("card.photo") : t("card.photos", { n: photos })) + "</span>" : "";
     if (videos) out += "<span>" + TM.icons.video + (videos === 1 ? t("card.video") : t("card.videos", { n: videos })) + "</span>";
     return out;
   }
@@ -72,22 +73,32 @@
     return "place.html?slug=" + encodeURIComponent(place.slug);
   }
 
+  /* <img> markup for a photo/poster with lazy loading and responsive sources; "" when none. */
+  function imgTag(img, alt, opts) {
+    if (!img) return "";
+    return (
+      '<img class="lazy-img" loading="' + (opts.eager ? "eager" : "lazy") + '" decoding="async" alt="' + esc(alt) + '" src="' + esc(img.src) + '"' +
+      (img.srcset ? ' srcset="' + esc(img.srcset) + '" sizes="' + opts.sizes + '"' : "") +
+      ">"
+    );
+  }
+
+  /* Placeholder for destinations without photos yet: brand gradient with a compass. */
+  function noCover() {
+    return '<div class="no-cover" aria-hidden="true">' + TM.icons.compass + "</div>";
+  }
+
   function placeCard(place, index) {
     var c = TM.api.cover(place);
+    var img = TM.api.coverImage(place, "thumb");
     /* Alternate tall / wide crops for an editorial rhythm. */
     var ratios = ["4 / 5", "1 / 1", "3 / 4", "5 / 4", "4 / 5", "2 / 3"];
     var ratio = ratios[index % ratios.length];
-    var rp = ratio.split(" / ");
-    var w = 900;
-    var h = Math.round((w * +rp[1]) / +rp[0]);
     var name = pick(place.name);
     return (
-      '<a class="place-card reveal" href="' + placeHref(place) + '" style="--ratio:' + ratio + '" aria-label="' + esc(t("card.open", { name: name })) + '">' +
-      '<div class="media shimmer">' +
-      '<img class="lazy-img" loading="' + (index < 3 ? "eager" : "lazy") + '" decoding="async" alt="' + esc(pick(c.altText)) + '" ' +
-      'src="' + esc(TM.api.mediaUrl(c, w, h)) + '" ' +
-      'srcset="' + esc(TM.api.mediaUrl(c, 480, Math.round((480 * +rp[1]) / +rp[0])) + " 480w, " + TM.api.mediaUrl(c, w, h) + " 900w") + '" ' +
-      'sizes="(max-width: 640px) 50vw, (max-width: 1100px) 50vw, 33vw">' +
+      '<a class="place-card reveal' + (img ? "" : " is-empty") + '" href="' + placeHref(place) + '" style="--ratio:' + ratio + '" aria-label="' + esc(t("card.open", { name: name })) + '">' +
+      '<div class="media' + (img ? " shimmer" : "") + '">' +
+      (img ? imgTag(img, pick(c.altText), { eager: index < 3, sizes: "(max-width: 640px) 50vw, (max-width: 1100px) 50vw, 33vw" }) : noCover()) +
       "</div>" +
       '<span class="go">' + TM.icons.arrowUpRight + "</span>" +
       '<div class="body">' +
@@ -113,12 +124,14 @@
   }
 
   function mediaTile(place, m, i) {
-    var ratio = m.width + " / " + m.height;
+    var ratio = TM.api.ratio(m);
     var alt = pick(m.altText);
     if (m.type === "video") {
+      var poster = TM.api.image(m);
       return (
         '<button type="button" class="media-tile reveal" data-index="' + i + '" style="--ratio:' + ratio + '" aria-label="' + esc(t("media.play", { alt: alt })) + '">' +
-        '<div class="media shimmer"><video muted loop playsinline preload="metadata" src="' + esc(TM.api.mediaUrl(m)) + '#t=0.5"></video></div>' +
+        '<div class="media shimmer"><video muted loop playsinline preload="' + (poster ? "none" : "metadata") + '"' +
+        (poster ? ' poster="' + esc(poster.src) + '"' : "") + ' src="' + esc(m.url) + (poster ? "" : "#t=0.5") + '"></video></div>' +
         '<span class="play-orb">' + TM.icons.play + "</span>" +
         '<span class="media-badge">' + TM.icons.video + esc(t("media.video")) + "</span>" +
         "</button>"
@@ -126,9 +139,7 @@
     }
     return (
       '<button type="button" class="media-tile reveal" data-index="' + i + '" style="--ratio:' + ratio + '" aria-label="' + esc(t("media.view", { alt: alt })) + '">' +
-      '<div class="media shimmer"><img class="lazy-img" loading="lazy" decoding="async" alt="' + esc(alt) + '" ' +
-      'src="' + esc(TM.api.mediaUrl(m, 900)) + '" srcset="' + esc(TM.api.srcset(m, [480, 900, 1400])) + '" ' +
-      'sizes="(max-width: 640px) 50vw, (max-width: 1100px) 50vw, 33vw"></div>' +
+      '<div class="media shimmer">' + imgTag(TM.api.image(m, "thumb"), alt, { sizes: "(max-width: 640px) 50vw, (max-width: 1100px) 50vw, 33vw" }) + "</div>" +
       "</button>"
     );
   }
@@ -144,9 +155,18 @@
 
     container.querySelectorAll("video").forEach(function (v) {
       var holder = v.closest(".media");
-      v.addEventListener("loadeddata", function () {
-        holder.classList.remove("shimmer");
-      }, { once: true });
+      if (v.poster) {
+        // The poster is a small image: show it as soon as it has loaded, without fetching the video.
+        var probe = new Image();
+        probe.onload = probe.onerror = function () {
+          holder.classList.remove("shimmer");
+        };
+        probe.src = v.poster;
+      } else {
+        v.addEventListener("loadeddata", function () {
+          holder.classList.remove("shimmer");
+        }, { once: true });
+      }
       var tile = v.closest(".media-tile");
       /* Silent preview on hover (pointer devices only). */
       if (window.matchMedia("(hover: hover)").matches) {
@@ -172,6 +192,8 @@
     wireLazy: wireLazy,
     reveal: reveal,
     placeHref: placeHref,
+    imgTag: imgTag,
+    noCover: noCover,
     renderPlaceCards: renderPlaceCards,
     renderSkeletons: renderSkeletons,
     renderMediaGrid: renderMediaGrid,

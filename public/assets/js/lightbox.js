@@ -96,7 +96,9 @@
         v.controls = true;
         v.playsInline = true;
         v.preload = "metadata";
-        v.src = TM.api.mediaUrl(m);
+        v.src = m.url;
+        var poster = TM.api.image(m);
+        if (poster) v.poster = poster.src;
         v.setAttribute("aria-label", TM.i18n.pick(m.altText));
         slide.appendChild(v);
       } else {
@@ -106,9 +108,12 @@
         var img = new Image();
         img.alt = slide.getAttribute("data-alt");
         img.decoding = "async";
-        img.sizes = "100vw";
-        img.srcset = TM.api.srcset(m, [800, 1280, 1800, 2400]);
-        img.src = TM.api.mediaUrl(m, 1800);
+        var pic = TM.api.image(m, "display");
+        if (pic.srcset) {
+          img.sizes = "100vw";
+          img.srcset = pic.srcset;
+        }
+        img.src = pic.src;
         img.draggable = false;
         img.style.opacity = "0";
         img.style.transition = "opacity 400ms ease";
@@ -167,12 +172,10 @@
     track.innerHTML = items.map(slideHtml).join("");
     strip.innerHTML = items
       .map(function (m, k) {
+        var small = TM.api.image(m, "thumb");
         var thumb =
-          m.type === "video"
-            ? TM.api.poster(p)
-              ? '<img alt="" src="' + TM.ui.esc(TM.api.poster(p).replace(/w=\d+/, "w=120").replace(/h=\d+/, "h=86")) + '"><span class="mini-play">' + TM.icons.play + "</span>"
-              : '<span class="mini-play">' + TM.icons.play + "</span>"
-            : '<img alt="" loading="lazy" src="' + TM.ui.esc(TM.api.mediaUrl(m, 120, 86)) + '">';
+          (small ? '<img alt="" loading="lazy" src="' + TM.ui.esc(small.src) + '">' : "") +
+          (m.type === "video" ? '<span class="mini-play">' + TM.icons.play + "</span>" : "");
         return '<button type="button" class="lb-thumb" data-index="' + k + '">' + thumb + "</button>";
       })
       .join("");

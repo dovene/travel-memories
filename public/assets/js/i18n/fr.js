@@ -83,6 +83,12 @@ window.TM.locales.fr = {
   "viewer.counter": "{i} / {n}",
   "viewer.goto": "Aller à l'élément {n}",
 
+  "card.soon": "Photos bientôt",
+  "place.noMediaTitle": "Photos bientôt disponibles",
+  "place.noMediaText": "Les photos et vidéos de ce voyage ne sont pas encore publiées.",
+  "errors.loadTitle": "Impossible de charger le carnet",
+  "errors.loadText": "Vérifiez votre connexion et réessayez.",
+  "errors.retry": "Réessayer",
   "footer.rights": "© {year} Travel Memories. Les photographies appartiennent à leurs auteurs.",
   "footer.admin": "Administration",
   "footer.top": "Retour en haut"

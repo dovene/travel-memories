@@ -1,5 +1,6 @@
 /*
- * Mock content for the Phase 0 design prototype.
+ * Starter destinations used by scripts/seed-content.js and by tests
+ * (originally the Phase 0 design-prototype mock content).
  *
  * Shapes follow the draft schemas in the specification (profile.json /
  * places.json). In the prototype, `filename` holds an Unsplash photo id so

@@ -1,6 +1,6 @@
 {
   "name": "travel-memories",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Personal travel publishing platform on Cloudflare Workers + R2.",
   "type": "module",

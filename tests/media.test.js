@@ -15,6 +15,7 @@ const MP4 = ftyp("isom");
 
 function setup() {
   const bucket = new FakeR2();
+  bucket.putJsonSync(keys.username("dovene"), { ownerId: "dovene" }); // public URLs resolve @dovene
   const env = { STORAGE: bucket };
   const call = (method, path, { owner = "dovene", body, headers = {} } = {}) => {
     const init = { method, headers: { ...(method === "GET" ? {} : { Origin: ORIGIN }), ...headers } };
@@ -193,3 +194,77 @@ function setupCall(bucket) {
       env, {}, testAuth
     );
 }
+
+describe("preview variants", () => {
+  const THUMB = Uint8Array.from([0xff, 0xd8, 0xff, 0xdb, ...new Array(30).fill(3)]);
+  async function photoAndVideo() {
+    const ctx = setup();
+    const place = await setupCall(ctx.bucket)("POST", "/api/admin/places", { body: { name: { en: "A" }, city: "A", country: { en: "A" }, countryCode: "AA" } }).then((r) => r.json());
+    await ctx.upload(place.id, JPEG, "image/jpeg", "photo.jpg");
+    const p = await (await ctx.upload(place.id, MP4, "video/mp4", "clip.mp4")).json();
+    const variant = (mediaId, name, bytes, headers = {}, owner) =>
+      ctx.call("PUT", `/api/admin/places/${place.id}/media/${mediaId}/variants/${name}`, {
+        owner,
+        body: bytes,
+        headers: { "Content-Type": "image/jpeg", "X-Media-Width": "640", "X-Media-Height": "427", ...headers },
+      });
+    return { ...ctx, place, photo: p.media[0], video: p.media[1], variant };
+  }
+
+  test("a thumbnail is stored, listed with its own URL and served instead of the original", async () => {
+    const { call, place, photo, variant } = await photoAndVideo();
+    const res = await variant(photo.id, "thumb", THUMB);
+    assert.equal(res.status, 200);
+    const thumb = (await res.json()).media.find((m) => m.id === photo.id).variants.thumb;
+    assert.deepEqual([thumb.width, thumb.height, thumb.contentType, thumb.size], [640, 427, "image/jpeg", THUMB.length]);
+    assert.match(thumb.url, new RegExp(`^/api/public/dovene/media/${photo.id}\\?variant=thumb&v=[a-z0-9]+$`));
+
+    const served = await call("GET", thumb.url);
+    assert.deepEqual(new Uint8Array(await served.arrayBuffer()), THUMB);
+    const pub = await (await call("GET", `/api/public/dovene/places/${place.slug}`)).json();
+    assert.equal(pub.media[0].variants.thumb.url, thumb.url);
+  });
+
+  test("regenerating a preview replaces the file and changes the URL", async () => {
+    const { bucket, place, photo, variant } = await photoAndVideo();
+    const first = (await (await variant(photo.id, "thumb", THUMB)).json()).media[0].variants.thumb;
+    const second = (await (await variant(photo.id, "thumb", THUMB)).json()).media[0].variants.thumb;
+    assert.notEqual(first.url, second.url);
+    assert.equal(await bucket.head(keys.media("dovene", place.id, first.filename)), null, "old preview deleted");
+    assert.ok(await bucket.head(keys.media("dovene", place.id, second.filename)));
+  });
+
+  test("missing previews: photos fall back to the original, video posters are 404", async () => {
+    const { call, photo, video } = await photoAndVideo();
+    const display = await call("GET", `/api/public/dovene/media/${photo.id}?variant=display`);
+    assert.equal(display.status, 200);
+    assert.deepEqual(new Uint8Array(await display.arrayBuffer()), JPEG);
+    assert.equal((await call("GET", `/api/public/dovene/media/${video.id}?variant=poster`)).status, 404);
+    assert.equal((await call("GET", `/api/public/dovene/media/${photo.id}?variant=huge`)).status, 404);
+  });
+
+  test("a video poster can be attached", async () => {
+    const { call, video, variant } = await photoAndVideo();
+    const poster = (await (await variant(video.id, "poster", THUMB, { "X-Media-Width": "1280", "X-Media-Height": "720" })).json()).media[1].variants.poster;
+    assert.equal((await call("GET", poster.url)).status, 200);
+  });
+
+  test("previews are validated like originals", async () => {
+    const { photo, variant } = await photoAndVideo();
+    assert.equal((await variant(photo.id, "thumb", THUMB, { "X-Media-Width": "" })).status, 422);
+    assert.equal((await variant(photo.id, "thumb", THUMB, { "X-Media-Width": "9000" })).status, 422);
+    assert.equal((await variant(photo.id, "thumb", THUMB, { "Content-Length": String(2 * 1024 * 1024) })).status, 413);
+    assert.equal((await variant(photo.id, "thumb", PNG)).status, 415, "PNG bytes declared as JPEG");
+    assert.equal((await variant(photo.id, "thumb", THUMB, { "Content-Type": "image/gif" })).status, 415);
+    assert.equal((await variant(photo.id, "huge", THUMB)).status, 404);
+    assert.equal((await variant("img-missing", "thumb", THUMB)).status, 404);
+    assert.equal((await variant(photo.id, "thumb", THUMB, {}, "sarah")).status, 404, "another owner");
+  });
+
+  test("deleting media also deletes its previews", async () => {
+    const { bucket, call, place, photo, variant } = await photoAndVideo();
+    const thumb = (await (await variant(photo.id, "thumb", THUMB)).json()).media[0].variants.thumb;
+    await call("DELETE", `/api/admin/places/${place.id}/media/${photo.id}`);
+    assert.equal(await bucket.head(keys.media("dovene", place.id, thumb.filename)), null);
+  });
+});

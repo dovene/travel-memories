@@ -11,11 +11,14 @@ function loadTM(files) {
     localStorage: { getItem: (k) => store[k] ?? null, setItem: (k, v) => (store[k] = v) },
     document: { querySelectorAll: () => [], documentElement: {}, addEventListener: () => {} },
   };
-  for (const f of files) vm.runInNewContext(readFileSync(new URL(`../public/assets/js/${f}`, import.meta.url), "utf8"), ctx);
+  for (const f of files) {
+    const path = f.startsWith("fixtures/") ? `../scripts/${f}` : `../public/assets/js/${f}`;
+    vm.runInNewContext(readFileSync(new URL(path, import.meta.url), "utf8"), ctx);
+  }
   return ctx.window.TM;
 }
 
-const TM = loadTM(["i18n/en.js", "i18n/fr.js", "i18n.js", "data/mock-content.js", "filters.js", "app.js"]);
+const TM = loadTM(["i18n/en.js", "i18n/fr.js", "i18n.js", "fixtures/starter-content.js", "filters.js", "app.js"]);
 const places = TM.mock.places.places;
 // Array.from builds the array in this realm (the sandbox has its own Array).
 const names = (list) => Array.from(list, (p) => p.slug).sort();

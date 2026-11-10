@@ -83,6 +83,12 @@ window.TM.locales.en = {
   "viewer.counter": "{i} / {n}",
   "viewer.goto": "Go to item {n}",
 
+  "card.soon": "Photos coming soon",
+  "place.noMediaTitle": "Photos coming soon",
+  "place.noMediaText": "The photographs and videos from this trip haven't been published yet.",
+  "errors.loadTitle": "The journal could not be loaded",
+  "errors.loadText": "Check your connection and try again.",
+  "errors.retry": "Try again",
   "footer.rights": "© {year} Travel Memories. All photographs belong to their authors.",
   "footer.admin": "Administration",
   "footer.top": "Back to top"

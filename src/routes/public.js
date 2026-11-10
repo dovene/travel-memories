@@ -3,7 +3,7 @@
  *   GET /api/public/:username/profile
  *   GET /api/public/:username/places
  *   GET /api/public/:username/places/:slug
- *   GET /api/public/:username/media/:mediaId
+ *   GET /api/public/:username/media/:mediaId[?variant=thumb|display|poster]
  */
 import { ApiError, json, methodNotAllowed, SECURITY_HEADERS } from "../utils/responses.js";
 import { ContentStore } from "../services/storage.js";
@@ -17,7 +17,16 @@ export function mediaBaseUrl(env, username) {
 export function presentPlace(place, base) {
   const media = [...place.media]
     .sort((a, b) => a.position - b.position)
-    .map((m) => ({ ...m, url: `${base}/${encodeURIComponent(m.id)}` }));
+    .map((m) => {
+      const url = `${base}/${encodeURIComponent(m.id)}`;
+      const variants = {};
+      for (const [name, v] of Object.entries(m.variants || {})) {
+        // The token in the stored name changes when a preview is regenerated, so the URL does too.
+        const token = (v.filename.match(/-([a-z0-9]+)\.[a-z]+$/) || [])[1] || "1";
+        variants[name] = { ...v, url: `${url}?variant=${name}&v=${token}` };
+      }
+      return { ...m, url, variants };
+    });
   return { ...place, media };
 }
 
@@ -37,7 +46,7 @@ function cachedJson(request, data, etag) {
   return json(data, 200, headers);
 }
 
-async function serveMedia(request, store, ownerId, mediaId) {
+async function serveMedia(request, store, ownerId, mediaId, variantName) {
   const { data } = await store.getPlaces(ownerId);
   let found = null;
   for (const place of data.places) {
@@ -49,14 +58,23 @@ async function serveMedia(request, store, ownerId, mediaId) {
   }
   if (!found) throw new ApiError(404, "not_found", "Media not found.");
 
-  const object = await store.getMediaObject(ownerId, found.place.id, found.media.filename, {
+  // Previews fall back to the original for photos; a missing video poster is simply absent.
+  let file = { filename: found.media.filename, contentType: found.media.contentType };
+  if (variantName) {
+    const v = found.media.variants && found.media.variants[variantName];
+    if (v) file = v;
+    else if (found.media.type === "video" || !["thumb", "display", "poster"].includes(variantName))
+      throw new ApiError(404, "not_found", "Preview not found.");
+  }
+
+  const object = await store.getMediaObject(ownerId, found.place.id, file.filename, {
     range: request.headers,
     onlyIf: request.headers,
   });
   if (!object) throw new ApiError(404, "not_found", "Media file is missing.");
 
   const headers = new Headers(SECURITY_HEADERS);
-  headers.set("Content-Type", found.media.contentType); // from validated metadata, not from the file
+  headers.set("Content-Type", file.contentType); // from validated metadata, not from the file
   headers.set("Cache-Control", "public, max-age=31536000, immutable"); // media ids never point to different bytes
   headers.set("ETag", object.httpEtag);
   headers.set("Accept-Ranges", "bytes");
@@ -99,7 +117,7 @@ export async function handlePublic(request, env, segments) {
     return cachedJson(request, presentPlace(place, base), etag && `${etag}-${place.id}`);
   }
 
-  if (resource === "media" && id !== undefined) return serveMedia(request, store, ownerId, id);
+  if (resource === "media" && id !== undefined) return serveMedia(request, store, ownerId, id, new URL(request.url).searchParams.get("variant"));
 
   throw new ApiError(404, "not_found", "Resource not found.");
 }
