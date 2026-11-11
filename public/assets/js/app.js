@@ -311,9 +311,8 @@
     function sectionHtml(p, n) {
       var c = TM.api.cover(p);
       var heroImg = TM.api.coverImage(p, "display");
-      // Too small or portrait to fill the screen: show it whole over a blurred copy of itself.
+      // Too small or portrait to fill the screen: show it whole on a solid colour taken from it.
       var contained = Boolean(heroImg && !heroImg.sharp);
-      var backdrop = contained ? TM.api.coverImage(p, "thumb") : null;
       var loading = n === 0 ? 'fetchpriority="high"' : 'loading="lazy"';
       var photos = p.media.filter(function (m) {
         return m.type === "image";
@@ -331,8 +330,7 @@
       return (
         '<section class="place-hero' + (heroImg ? "" : " is-plain") + (contained ? " is-contained" : "") + '">' +
         (contained
-          ? '<img class="hero-backdrop" alt="" aria-hidden="true" ' + loading + ' src="' + esc(backdrop.src) + '">' +
-            '<img class="hero-photo" alt="' + esc(pick(c.altText)) + '" ' + loading + ' src="' + esc(heroImg.src) + '"' +
+          ? '<img class="hero-photo" alt="' + esc(pick(c.altText)) + '" ' + loading + ' src="' + esc(heroImg.src) + '"' +
             (heroImg.width ? ' style="--photo-w:' + Number(heroImg.width) + 'px"' : "") + ">"
           : heroImg
           ? '<img alt="' + esc(pick(c.altText)) + '" ' + loading + ' src="' + esc(heroImg.src) + '"' +
@@ -372,6 +370,8 @@
           TM.lightbox.open(p, i, el);
         });
       }
+      var heroPhoto = article.querySelector(".hero-photo");
+      if (heroPhoto) TM.ui.tintFrom(heroPhoto, article.querySelector(".place-hero"));
       TM.ui.wireLazy(article);
       TM.ui.reveal(article);
     }

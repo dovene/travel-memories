@@ -91,6 +91,38 @@
     );
   }
 
+  /*
+   * Solid background colour taken from a picture: its average colour, softened towards the
+   * brand navy so it stays calm. Set as --tint on `target` once the image has loaded
+   * (media are same-origin, so the pixels can be read).
+   */
+  function tintFrom(img, target) {
+    function apply() {
+      try {
+        var c = document.createElement("canvas");
+        c.width = c.height = 8;
+        var ctx = c.getContext("2d", { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, 8, 8);
+        var d = ctx.getImageData(0, 0, 8, 8).data;
+        var r = 0, g = 0, b = 0;
+        for (var i = 0; i < d.length; i += 4) {
+          r += d[i];
+          g += d[i + 1];
+          b += d[i + 2];
+        }
+        var n = d.length / 4;
+        var mix = function (v, navy) {
+          return Math.round((v / n) * 0.55 + navy * 0.45);
+        };
+        target.style.setProperty("--tint", "rgb(" + mix(r, 23) + ", " + mix(g, 45) + ", " + mix(b, 66) + ")");
+      } catch (e) {
+        /* unreadable image: keep the navy fallback */
+      }
+    }
+    if (img.complete && img.naturalWidth) apply();
+    else img.addEventListener("load", apply, { once: true });
+  }
+
   /* Placeholder for destinations without photos yet: brand gradient with a compass. */
   function noCover() {
     return '<div class="no-cover" aria-hidden="true">' + TM.icons.compass + "</div>";
@@ -109,7 +141,7 @@
       '<a class="place-card reveal' + (img ? "" : " is-empty") + (place.featured ? " is-featured" : "") + '" href="' + esc(placeHref(place, cardContext)) + '" style="--ratio:' + ratio + '" aria-label="' +
       esc(place.featured ? t("card.openFeatured", { name: name }) : t("card.open", { name: name })) + '">' +
       (place.featured ? '<span class="crown" title="' + esc(t("featured.badge")) + '">' + TM.icons.crown + "</span>" : "") +
-      '<div class="media' + (img ? " shimmer" : "") + '">' +
+      '<div class="media' + (img ? " shimmer" : "") + (img && img.lowRes ? " is-letterboxed" : "") + '">' +
       (img ? imgTag(img, pick(c.altText), { eager: index < 3, sizes: "(max-width: 640px) 50vw, (max-width: 1100px) 50vw, 33vw" }) : noCover()) +
       "</div>" +
       '<span class="go">' + TM.icons.arrowUpRight + "</span>" +
@@ -125,6 +157,10 @@
   function renderPlaceCards(container, places, context) {
     cardContext = context || null;
     container.innerHTML = places.map(placeCard).join("");
+    // Low-res covers are shown whole, centred on a solid colour taken from the picture.
+    container.querySelectorAll(".media.is-letterboxed img").forEach(function (img) {
+      tintFrom(img, img.parentNode);
+    });
     wireLazy(container);
     reveal(container);
   }
@@ -206,6 +242,7 @@
     reveal: reveal,
     placeHref: placeHref,
     imgTag: imgTag,
+    tintFrom: tintFrom,
     noCover: noCover,
     renderPlaceCards: renderPlaceCards,
     renderSkeletons: renderSkeletons,

@@ -50,6 +50,11 @@
   var DISPLAY_MAX = 2048;
   /* A photo is sharp enough to fill the screen when it is landscape and at least this wide. */
   var HERO_MIN_WIDTH = 1600;
+  /* Below this long side a picture looks pixelated when enlarged: show it whole on a solid colour. */
+  var LOW_RES_MAX = 1000;
+  function isLowRes(w, h) {
+    return Boolean(w && h && Math.max(w, h) < LOW_RES_MAX);
+  }
 
   /*
    * The original can stand in for the "display" copy when browsers can show it and it is no
@@ -67,7 +72,9 @@
     if (!m) return null;
     if (m.type === "video") {
       var poster = variant(m, "poster");
-      return poster ? { src: poster.url, srcset: "", width: poster.width, height: poster.height, sharp: false } : null;
+      return poster
+        ? { src: poster.url, srcset: "", width: poster.width, height: poster.height, sharp: false, lowRes: isLowRes(m.width || poster.width, m.height || poster.height) }
+        : null;
     }
     var thumb = variant(m, "thumb");
     var display = originalIsDisplay(m) ? { url: m.url, width: m.width } : variant(m, "display");
@@ -82,7 +89,8 @@
       srcset: parts.length > 1 ? parts.join(", ") : "",
       width: width,
       height: height,
-      sharp: Boolean(width && height && width >= HERO_MIN_WIDTH && width >= height * 1.2)
+      sharp: Boolean(width && height && width >= HERO_MIN_WIDTH && width >= height * 1.2),
+      lowRes: isLowRes(width, height)
     };
   }
 

@@ -472,12 +472,13 @@
   }
 
   /*
-   * Small media look soft when shown large (hero, cover, fullscreen). Thresholds: photos under
-   * 1600 px on their long side, videos under 1280 px. Messaging apps often shrink photos this way.
+   * Only media small enough to look visibly pixelated get the label: under 1000 px on their
+   * long side (e.g. low-quality videos). Typical messaging-app photos (~1280 px) look fine.
+   * Same threshold as LOW_RES_MAX in api.js, which centres such pictures on a solid colour.
    */
   function lowResBadge(m) {
     var long = Math.max(m.width || 0, m.height || 0);
-    if (!long || long >= (m.type === "video" ? 1280 : 1600)) return "";
+    if (!long || long >= 1000) return "";
     var tip = m.width + "×" + m.height + " px — may look soft in large views. Upload the original (not a messaging-app copy) for full sharpness.";
     return '<span class="lowres" title="' + esc(tip) + '">Low res</span>';
   }

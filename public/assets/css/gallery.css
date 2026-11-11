@@ -27,16 +27,11 @@
 
 /*
  * Covers too small or too tall to fill the screen: the photo is shown whole (never enlarged
- * past its size) over a blurred, darkened enlargement of itself.
+ * past its size) on a solid colour taken from the photo itself.
  */
-.place-hero.is-contained > img.hero-backdrop {
-  inset: -8%;
-  width: 116%;
-  height: 116%;
-  z-index: -3;
-  filter: blur(36px) saturate(1.15) brightness(0.62);
-  transform: none;
-  animation: none;
+.place-hero.is-contained {
+  background: var(--tint, var(--navy));
+  transition: background-color 0.6s var(--ease);
 }
 
 /* Wide screens: text on the left half, photo on the right half. */

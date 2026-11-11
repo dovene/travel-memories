@@ -129,6 +129,9 @@ test("image quality rules: small originals are used as is, only sharp landscape 
   assert.equal(api.image(photo("wide", 2400, 1600)).sharp, true);
   assert.equal(api.image(photo("tall", 3000, 4000)).sharp, false, "portrait");
   assert.equal(api.image(photo("tiny", 1280, 960)).sharp, false, "too small");
+  assert.equal(api.image(photo("whatsapp", 1280, 960)).lowRes, false, "typical messaging-app photos are fine");
+  assert.equal(api.image(photo("clip-frame", 478, 850)).lowRes, true, "very small pictures are shown whole on a colour");
+  assert.equal(api.image({ id: "v", type: "video", url: "/m/v", width: 478, height: 850, variants: { poster: v("poster", 478, 850) } }).lowRes, true);
 
   const place = (slug, media, extra = {}) => ({ slug, coverMediaId: media[0] && media[0].id, media, ...extra });
   const video = { id: "vid", type: "video", url: "/m/vid", width: 478, height: 850, variants: { poster: v("poster", 478, 850) } };

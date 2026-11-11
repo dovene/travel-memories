@@ -94,8 +94,9 @@ The server checks previews exactly like originals (type, signature, size, pixel 
 **Image quality rules:**
 - **No double compression:** web-friendly originals of 2048 px or less (JPEG, PNG, WEBP, AVIF) are shown as they are. They get only a thumbnail, never a recompressed display copy.
 - **Homepage hero:** it only uses sharp landscape photos, at least 1600 px wide and clearly wider than tall, in display order (featured first). Video frames, portrait photos and small photos stay on cards and in galleries. With no qualifying photo, the hero shows the brand gradient.
-- **Destination covers:** a cover that's too small or portrait for full width is shown whole, never enlarged past its size, over a blurred copy of itself. On wide screens it sits beside the title; on phones it sits above it.
-- **Admin warning:** a **Low res** label marks photos under 1600 px on their long side and videos under 1280 px. Photos sent through messaging apps are usually shrunk, so upload the originals for full sharpness.
+- **Destination covers:** a cover that's too small or portrait for full width is shown whole, never enlarged past its size, on a solid colour taken from the photo (its average colour, softened towards navy). On wide screens it sits beside the title; on phones it sits above it.
+- **Very small pictures** (under 1000 px on their long side, such as frames from low-quality videos): homepage cards show them whole, centred on that same solid colour, instead of cropping and enlarging them.
+- **Admin warning:** a **Low res** label marks only media under 1000 px on their long side, the ones that visibly pixelate. Typical messaging-app photos (about 1280 px) aren't flagged, though originals are still sharper.
 
 A photo without previews falls back to its original. HEIC photos only get previews when uploaded from Safari, because other browsers can't decode HEIC. The size limits come from Cloudflare's 100 MB request limit on the free plan. Larger videos would need direct uploads to R2 with presigned URLs, which the spec lists as a later option. The first upload becomes the cover. Removing an item deletes its file, and deleting a destination deletes its folder.
 
