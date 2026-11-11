@@ -27,6 +27,7 @@
     logout: "<svg " + a + '><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>',
     alert: "<svg " + a + '><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></svg>',
     image: "<svg " + a + '><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg>',
-    menu: "<svg " + a + '><path d="M4 7h16M4 12h16M4 17h16"/></svg>'
+    menu: "<svg " + a + '><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
+    crown: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3.2 8.1a1 1 0 0 1 1.6-.9l3.9 3.1 2.5-4.8a1 1 0 0 1 1.8 0l2.5 4.8 3.9-3.1a1 1 0 0 1 1.6.9l-1.6 9.1a1 1 0 0 1-1 .8H5.8a1 1 0 0 1-1-.8z"/><rect x="5.5" y="19.5" width="13" height="1.8" rx=".9"/></svg>'
   };
 })();

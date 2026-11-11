@@ -1032,3 +1032,32 @@ dialog.confirm .buttons {
     padding-top: var(--space-5);
   }
 }
+
+/* Featured toggle and sidebar crown */
+.feature-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.feature-toggle.is-on {
+  --btn-bg: rgba(242, 193, 78, 0.16);
+  --btn-fg: #8a6510;
+  border-color: rgba(242, 193, 78, 0.6);
+}
+
+.feature-toggle.is-on svg {
+  color: #d9a22a;
+}
+
+.list-crown {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  color: #d9a22a;
+}
+
+.list-crown svg {
+  width: 16px;
+  height: 16px;
+}

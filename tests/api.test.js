@@ -257,3 +257,38 @@ describe("conflicts and owner isolation", () => {
     assert.deepEqual((await (await call("GET", "/api/admin/places", { owner: "dovene" })).json()).places, []);
   });
 });
+
+describe("featured destinations and display order", () => {
+  const trip = (name, visitedAt, extra = {}) => ({ ...berlin, name: { en: name }, visitedAt, ...extra });
+
+  test("featured first, then the most recent trip, then the most recently created", async () => {
+    const { call } = setup();
+    await call("POST", "/api/admin/places", { owner: "dovene", body: trip("Old trip", "2019-05") });
+    await call("POST", "/api/admin/places", { owner: "dovene", body: trip("Year only", "2024") });
+    await call("POST", "/api/admin/places", { owner: "dovene", body: trip("Recent", "2026-03") });
+    await call("POST", "/api/admin/places", { owner: "dovene", body: { ...berlin, name: { en: "No date" }, visitedAt: undefined } });
+    await call("POST", "/api/admin/places", { owner: "dovene", body: trip("Favourite", "2018-01", { featured: true }) });
+    await call("POST", "/api/admin/places", { owner: "dovene", body: trip("Mid 2024", "2024-07") });
+
+    const names = async (path) => (await (await call("GET", path, { owner: "dovene" })).json()).places.map((p) => p.name.en);
+    const expected = ["Favourite", "Recent", "Mid 2024", "Year only", "Old trip", "No date"];
+    assert.deepEqual(await names("/api/public/dovene/places"), expected);
+    assert.deepEqual(await names("/api/admin/places"), expected, "the admin list uses the same order");
+  });
+
+  test("the flag can be switched on and off, and only accepts true or false", async () => {
+    const { bucket, call } = setup();
+    const place = await (await call("POST", "/api/admin/places", { owner: "dovene", body: berlin })).json();
+    assert.equal(place.featured, undefined, "not featured by default");
+
+    const on = await (await call("PUT", `/api/admin/places/${place.id}`, { owner: "dovene", body: { featured: true }, headers: { "If-Match": '"1"' } })).json();
+    assert.equal(on.featured, true);
+    const off = await (await call("PUT", `/api/admin/places/${place.id}`, { owner: "dovene", body: { featured: false }, headers: { "If-Match": '"2"' } })).json();
+    assert.equal(off.featured, undefined, "switching off removes the flag from the stored document");
+    assert.equal("featured" in bucket.json(keys.places("dovene")).places[0], false);
+
+    const bad = await call("PUT", `/api/admin/places/${place.id}`, { owner: "dovene", body: { featured: "yes" }, headers: { "If-Match": '"3"' } });
+    assert.equal(bad.status, 422);
+    assert.deepEqual((await bad.json()).error.details.map((d) => d.path), ["/featured"]);
+  });
+});

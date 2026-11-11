@@ -127,6 +127,10 @@
           "pattern": "^\\d{4}(-(0[1-9]|1[0-2]))?$",
           "description": "Year or year-month of the visit (YYYY or YYYY-MM)."
         },
+        "featured": {
+          "type": "boolean",
+          "description": "Featured destinations come first, wear a crown and lead the homepage hero. Absent means false."
+        },
         "coverMediaId": {
           "type": [
             "string",

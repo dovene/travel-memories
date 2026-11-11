@@ -106,7 +106,9 @@
     var ratio = ratios[index % ratios.length];
     var name = pick(place.name);
     return (
-      '<a class="place-card reveal' + (img ? "" : " is-empty") + '" href="' + esc(placeHref(place, cardContext)) + '" style="--ratio:' + ratio + '" aria-label="' + esc(t("card.open", { name: name })) + '">' +
+      '<a class="place-card reveal' + (img ? "" : " is-empty") + (place.featured ? " is-featured" : "") + '" href="' + esc(placeHref(place, cardContext)) + '" style="--ratio:' + ratio + '" aria-label="' +
+      esc(place.featured ? t("card.openFeatured", { name: name }) : t("card.open", { name: name })) + '">' +
+      (place.featured ? '<span class="crown" title="' + esc(t("featured.badge")) + '">' + TM.icons.crown + "</span>" : "") +
       '<div class="media' + (img ? " shimmer" : "") + '">' +
       (img ? imgTag(img, pick(c.altText), { eager: index < 3, sizes: "(max-width: 640px) 50vw, (max-width: 1100px) 50vw, 33vw" }) : noCover()) +
       "</div>" +

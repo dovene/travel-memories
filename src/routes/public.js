@@ -7,6 +7,7 @@
  */
 import { ApiError, json, methodNotAllowed, SECURITY_HEADERS } from "../utils/responses.js";
 import { ContentStore } from "../services/storage.js";
+import { sortPlaces } from "../services/places.js";
 
 /* Media URLs are generated, never stored, so content stays independent of the hosting provider. */
 export function mediaBaseUrl(env, username) {
@@ -111,7 +112,7 @@ export async function handlePublic(request, env, segments) {
   if (resource === "places") {
     const { data, etag } = await store.getPlaces(ownerId);
     const base = mediaBaseUrl(env, username);
-    if (id === undefined) return cachedJson(request, { places: data.places.map((p) => presentPlace(p, base)) }, etag);
+    if (id === undefined) return cachedJson(request, { places: sortPlaces(data.places).map((p) => presentPlace(p, base)) }, etag);
     const place = data.places.find((p) => p.slug === id);
     if (!place) throw new ApiError(404, "not_found", "Destination not found.");
     return cachedJson(request, presentPlace(place, base), etag && `${etag}-${place.id}`);

@@ -115,8 +115,62 @@
       city: (place && place.city) || "",
       countryCode: (place && place.countryCode) || "",
       countryText: place ? (findCountry(place.countryCode) || { en: place.country.en }).en : "",
-      visitedAt: (place && place.visitedAt) || ""
+      visitedAt: (place && place.visitedAt) || "",
+      featured: Boolean(place && place.featured)
     };
+  }
+
+  /* Same order as the public site: featured first, then most recent trip, then newest. */
+  function sortPlaces(list) {
+    var tripKey = function (p) {
+      return p.visitedAt ? (p.visitedAt.length === 4 ? p.visitedAt + "-00" : p.visitedAt) : "";
+    };
+    return list.slice().sort(function (a, b) {
+      var f = Number(Boolean(b.featured)) - Number(Boolean(a.featured));
+      if (f) return f;
+      var t = tripKey(b).localeCompare(tripKey(a));
+      if (t) return t;
+      return String(b.createdAt).localeCompare(String(a.createdAt));
+    });
+  }
+
+  /* ★ Featured toggle: saved immediately for existing destinations, with the first save for new ones. */
+  function renderFeature() {
+    var on = current ? Boolean(current.featured) : draft.featured;
+    var btn = $("feature-toggle");
+    btn.setAttribute("aria-pressed", String(on));
+    btn.classList.toggle("is-on", on);
+    btn.innerHTML = (on ? I.crown + "Featured" : I.star + "Feature");
+    btn.title = on ? "Shown first, with a crown. Click to remove." : "Show this destination first, with a crown";
+  }
+
+  function toggleFeature() {
+    if (!current) {
+      draft.featured = !draft.featured;
+      renderFeature();
+      setDirty(true);
+      return;
+    }
+    var btn = $("feature-toggle");
+    btn.disabled = true;
+    request("PUT", "/places/" + encodeURIComponent(current.id), { featured: !current.featured }, { "If-Match": '"' + current.version + '"' })
+      .then(function (place) {
+        replacePlace(place); // keeps any unsaved text edits in the form
+        renderFeature();
+        renderList();
+        TM.ui.toast(place.featured ? "“" + place.name.en + "” is now featured" : "No longer featured");
+      })
+      .catch(function (err) {
+        if (err.status === 412) {
+          TM.ui.toast("This destination changed elsewhere — reloaded.");
+          reloadCurrent();
+          return;
+        }
+        failed(err);
+      })
+      .then(function () {
+        btn.disabled = false;
+      });
   }
 
   function replacePlace(place) {
@@ -154,6 +208,7 @@
 
   /* ---------- sidebar ---------- */
   function renderList() {
+    places = sortPlaces(places);
     $("dest-list").innerHTML = places.length
       ? places
           .map(function (p) {
@@ -164,7 +219,7 @@
               '<li><button type="button" class="dest-item" data-id="' + esc(p.id) + '" aria-current="' + Boolean(current && p.id === current.id) + '">' +
               thumb +
               "<div><strong>" + esc(p.name.en) + "</strong><span>" + esc(p.city) + " · " + p.media.length + " item" + (p.media.length === 1 ? "" : "s") + "</span></div>" +
-              '<span class="status-dot" title="Published"></span></button></li>'
+              (p.featured ? '<span class="list-crown" title="Featured">' + I.crown + "</span>" : '<span class="status-dot" title="Published"></span>') + "</button></li>"
             );
           })
           .join("")
@@ -196,6 +251,7 @@
     $("editor-title").textContent = title;
     $("crumb-name").textContent = title;
     $("delete-place").hidden = !place;
+    renderFeature();
     $("city").value = draft.city;
     $("country").value = draft.countryText;
     $("visited").value = /^\d{4}-\d{2}$/.test(draft.visitedAt) ? draft.visitedAt : "";
@@ -273,6 +329,7 @@
       body.country = { en: country.en, fr: country.fr };
     }
     if (!current && !body.visitedAt) delete body.visitedAt;
+    if (!current && draft.featured) body.featured = true;
     return body;
   }
 
@@ -975,6 +1032,8 @@
         })
         .catch(failed);
     });
+
+    $("feature-toggle").addEventListener("click", toggleFeature);
 
     var dlg = $("confirm-delete");
     $("delete-place").addEventListener("click", function () {

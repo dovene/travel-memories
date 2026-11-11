@@ -332,7 +332,9 @@
           : "") +
         '<div class="container place-hero-content' + (n === 0 ? " hero-enter" : "") + '">' +
         '<a class="back-link" href="' + esc(homeHref()) + '">' + TM.icons.arrowLeft + esc(t(journey.filtered ? "journey.backFiltered" : "place.back")) + "</a>" +
-        '<p class="eyebrow">' + esc(p.city) + " · " + esc(pick(p.country)) + '<span class="journey-pos">' + esc(position) + "</span></p>" +
+        '<p class="eyebrow">' + esc(p.city) + " · " + esc(pick(p.country)) +
+        (p.featured ? '<span class="featured-tag">' + TM.icons.crown + esc(t("featured.badge")) + "</span>" : "") +
+        '<span class="journey-pos">' + esc(position) + "</span></p>" +
         "<" + Heading + ' class="place-title">' + esc(pick(p.name)) + "</" + Heading + ">" +
         "</div></section>" +
         '<div class="container">' +

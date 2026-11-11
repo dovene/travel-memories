@@ -57,6 +57,8 @@ window.TM.locales.en = {
   "card.photo": "1 photo",
   "card.videos": "{n} videos",
   "card.video": "1 video",
+  "card.openFeatured": "Open {name} (featured)",
+  "featured.badge": "Featured",
   "card.open": "Open {name}",
 
   "place.back": "All destinations",

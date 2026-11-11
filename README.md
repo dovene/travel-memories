@@ -277,5 +277,6 @@ wrangler.toml           Worker, assets, environments, R2 bindings
 ## Notes
 
 - The public site reads `/api/public/dovene/*`. To show another journal, set `<html data-username="…">` (the future `/@username` URLs build on this).
+- **Order and featured destinations:** destinations are listed with **featured** ones first (the ★ Feature button in the admin), then by most recent trip (`visitedAt`), then newest created. The same order applies to the homepage, the admin list and the journey. Featured destinations get a crown on their card (with a brief shimmer, static if reduced motion is on), a "Featured" label on their page, and their photos lead the homepage hero.
 - **Continuous journey:** a place page opens on the chosen destination and keeps adding the next ones as you scroll, then loops back to the first. The order is the homepage list you came from: card links carry the search (`q`) and country filter (`country`). The address bar and title follow the destination in view, and Back returns to the homepage.
 - Destinations without photos show a gradient placeholder, and the place page says "Photos coming soon". If the API can't be reached, the homepage and place pages show an error with a retry button.

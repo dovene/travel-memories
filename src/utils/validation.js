@@ -64,6 +64,7 @@ const placeInputSchema = {
     countryCode: placesSchema.$defs.place.properties.countryCode,
     visitedAt: placesSchema.$defs.place.properties.visitedAt,
     slug: placesSchema.$defs.place.properties.slug,
+    featured: placesSchema.$defs.place.properties.featured,
   },
   $defs: placesSchema.$defs,
 };

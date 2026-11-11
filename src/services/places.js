@@ -5,7 +5,23 @@
 import { ApiError } from "../utils/responses.js";
 import { validatePlaceInput } from "../utils/validation.js";
 
-const EDITABLE = ["name", "description", "city", "country", "countryCode", "visitedAt", "slug"];
+const EDITABLE = ["name", "description", "city", "country", "countryCode", "visitedAt", "slug", "featured"];
+
+/*
+ * Display order used everywhere (public list, admin list, and therefore the journey):
+ * featured destinations first, then the most recent trip (visitedAt, YYYY or YYYY-MM),
+ * then the most recently created. A year without month counts as the start of that year.
+ */
+export function sortPlaces(places) {
+  const tripKey = (p) => (p.visitedAt ? (p.visitedAt.length === 4 ? `${p.visitedAt}-00` : p.visitedAt) : "");
+  return [...places].sort((a, b) => {
+    const f = Number(Boolean(b.featured)) - Number(Boolean(a.featured));
+    if (f) return f;
+    const t = tripKey(b).localeCompare(tripKey(a));
+    if (t) return t;
+    return String(b.createdAt).localeCompare(String(a.createdAt));
+  });
+}
 
 export function slugify(text) {
   return String(text || "")
@@ -91,7 +107,7 @@ function checkVersion(place, expectedVersion) {
 
 export async function listPlaces(store, ownerId) {
   const { data } = await store.getPlaces(ownerId);
-  return data.places;
+  return sortPlaces(data.places);
 }
 
 export async function createPlace(store, ownerId, input) {
@@ -111,6 +127,7 @@ export async function createPlace(store, ownerId, input) {
       country: fields.country,
       countryCode: fields.countryCode,
       ...(fields.visitedAt ? { visitedAt: fields.visitedAt } : {}),
+      ...(fields.featured === true ? { featured: true } : {}),
       coverMediaId: null,
       media: [],
       createdAt: timestamp,
@@ -129,7 +146,7 @@ export async function updatePlace(store, ownerId, placeId, input, expectedVersio
     checkVersion(place, expectedVersion);
     for (const [key, value] of Object.entries(fields)) {
       if (key === "slug") place.slug = uniqueSlug(value, doc.places, place.id);
-      else if ((key === "description" && Object.keys(value).length === 0) || (key === "visitedAt" && value === "")) delete place[key];
+      else if ((key === "description" && Object.keys(value).length === 0) || (key === "visitedAt" && value === "") || (key === "featured" && value === false)) delete place[key];
       else place[key] = value;
     }
     place.version += 1;

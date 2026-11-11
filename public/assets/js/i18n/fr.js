@@ -57,6 +57,8 @@ window.TM.locales.fr = {
   "card.photo": "1 photo",
   "card.videos": "{n} vidéos",
   "card.video": "1 vidéo",
+  "card.openFeatured": "Ouvrir {name} (à la une)",
+  "featured.badge": "À la une",
   "card.open": "Ouvrir {name}",
 
   "place.back": "Toutes les destinations",
