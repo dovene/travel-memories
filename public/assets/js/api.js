@@ -45,52 +45,24 @@
     return m && m.variants && m.variants[name] ? m.variants[name] : null;
   }
 
-  /* Formats every browser can show directly (HEIC is not one of them). */
-  var WEB_SAFE = { "image/jpeg": true, "image/png": true, "image/webp": true, "image/avif": true };
-  var DISPLAY_MAX = 2048;
-  /* A photo is sharp enough to fill the screen when it is landscape and at least this wide. */
-  var HERO_MIN_WIDTH = 1600;
-  /* Below this long side a picture looks pixelated when enlarged: show it whole on a solid colour. */
-  var LOW_RES_MAX = 1000;
-  function isLowRes(w, h) {
-    return Boolean(w && h && Math.max(w, h) < LOW_RES_MAX);
-  }
-
-  /*
-   * The original can stand in for the "display" copy when browsers can show it and it is no
-   * larger than a display copy would be — this avoids a needless second JPEG compression.
-   */
-  function originalIsDisplay(m) {
-    return Boolean(WEB_SAFE[m.contentType] && m.width && m.height && Math.max(m.width, m.height) <= DISPLAY_MAX);
-  }
-
-  /*
-   * { src, srcset, width, height, sharp } for showing a photo (or a video's poster) at a given size.
-   * `sharp` tells whether it can fill a wide screen without visible enlargement.
-   */
+  /* { src, srcset, width, height } for showing a photo (or a video's poster) at a given size. */
   function image(m, size) {
     if (!m) return null;
     if (m.type === "video") {
       var poster = variant(m, "poster");
-      return poster
-        ? { src: poster.url, srcset: "", width: poster.width, height: poster.height, sharp: false, lowRes: isLowRes(m.width || poster.width, m.height || poster.height) }
-        : null;
+      return poster ? { src: poster.url, srcset: "", width: poster.width, height: poster.height } : null;
     }
     var thumb = variant(m, "thumb");
-    var display = originalIsDisplay(m) ? { url: m.url, width: m.width } : variant(m, "display");
+    var display = variant(m, "display");
     var parts = [];
     if (thumb) parts.push(thumb.url + " " + thumb.width + "w");
-    if (display && (!thumb || display.width > thumb.width)) parts.push(display.url + " " + display.width + "w");
+    if (display) parts.push(display.url + " " + display.width + "w");
     var preferred = size === "thumb" ? thumb || display : display || thumb;
-    var width = m.width || (preferred && preferred.width);
-    var height = m.height || (preferred && preferred.height);
     return {
       src: preferred ? preferred.url : m.url,
       srcset: parts.length > 1 ? parts.join(", ") : "",
-      width: width,
-      height: height,
-      sharp: Boolean(width && height && width >= HERO_MIN_WIDTH && width >= height * 1.2),
-      lowRes: isLowRes(width, height)
+      width: m.width || (preferred && preferred.width),
+      height: m.height || (preferred && preferred.height)
     };
   }
 
@@ -123,41 +95,16 @@
     return null;
   }
 
-  /* The destination's first sharp landscape photo (cover first), or null. */
-  function sharpPhoto(p) {
-    var candidates = [cover(p)].concat(p.media);
-    for (var k = 0; k < candidates.length; k++) {
-      var m = candidates[k];
-      var pic = m && m.type === "image" ? image(m, "display") : null;
-      if (pic && pic.sharp) return pic;
-    }
-    return null;
-  }
-
-  var HERO_MAX = 6;
-
-  /*
-   * Homepage hero slides, in display order:
-   *   1. every featured destination (up to the limit): its sharp landscape photo fills the
-   *      screen ("fill"); if it has none, its cover picture is shown whole on a solid colour
-   *      taken from it ("contained") — never stretched;
-   *   2. then sharp landscape photos of other destinations fill the remaining slots.
-   * No slide at all → the plain gradient hero.
-   */
+  /* Up to four destinations with a picture cover, for the homepage hero. */
   function heroSlides(places) {
-    var slides = [];
-    places.forEach(function (p) {
-      if (!p.featured || slides.length >= HERO_MAX) return;
-      var sharp = sharpPhoto(p);
-      var any = sharp || coverImage(p, "display");
-      if (any) slides.push({ place: p, image: any, mode: sharp ? "fill" : "contained" });
-    });
-    places.forEach(function (p) {
-      if (p.featured || slides.length >= HERO_MAX) return;
-      var sharp = sharpPhoto(p);
-      if (sharp) slides.push({ place: p, image: sharp, mode: "fill" });
-    });
-    return slides;
+    return places
+      .filter(function (p) {
+        return coverImage(p, "display");
+      })
+      .slice(0, 4)
+      .map(function (p) {
+        return { place: p, image: coverImage(p, "display") };
+      });
   }
 
   TM.api = {
@@ -167,7 +114,6 @@
     cover: cover,
     coverImage: coverImage,
     heroSlides: heroSlides,
-    originalIsDisplay: originalIsDisplay,
     getProfile: function () {
       return getJson("/profile");
     },

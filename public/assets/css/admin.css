@@ -1061,16 +1061,3 @@ dialog.confirm .buttons {
   width: 16px;
   height: 16px;
 }
-
-/* Low-resolution warning on media tiles */
-.lowres {
-  margin-left: auto;
-  margin-right: 6px;
-  padding: 3px 8px;
-  border-radius: var(--radius-pill);
-  background: rgba(242, 193, 78, 0.95);
-  color: #4a3505;
-  font-size: 0.6875rem;
-  letter-spacing: 0.04em;
-  cursor: help;
-}

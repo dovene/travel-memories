@@ -103,27 +103,14 @@
 
     slidesEl.innerHTML = slides
       .map(function (s, i) {
-        var load = i === 0 ? 'fetchpriority="high"' : 'loading="lazy"';
-        if (s.mode === "contained") {
-          // Small or portrait picture: shown whole on a solid colour taken from it, never stretched.
-          return (
-            '<div class="hero-slide is-contained' + (i === 0 ? " is-active" : "") + '">' +
-            '<img class="hero-photo" alt="" ' + load + ' src="' + esc(s.image.src) + '"' +
-            (s.image.width ? ' style="--photo-w:' + Number(s.image.width) + 'px"' : "") + ">" +
-            "</div>"
-          );
-        }
         return (
           '<div class="hero-slide' + (i === 0 ? " is-active" : "") + '">' +
-          '<img alt="" ' + load + ' src="' + esc(s.image.src) + '"' +
+          '<img alt="" ' + (i === 0 ? 'fetchpriority="high"' : 'loading="lazy"') + ' src="' + esc(s.image.src) + '"' +
           (s.image.srcset ? ' srcset="' + esc(s.image.srcset) + '" sizes="100vw"' : "") + ">" +
           "</div>"
         );
       })
       .join("");
-    slidesEl.querySelectorAll(".hero-slide.is-contained").forEach(function (slide) {
-      TM.ui.tintFrom(slide.querySelector("img"), slide);
-    });
 
     function renderDots() {
       dotsEl.innerHTML = slides
@@ -324,9 +311,6 @@
     function sectionHtml(p, n) {
       var c = TM.api.cover(p);
       var heroImg = TM.api.coverImage(p, "display");
-      // Too small or portrait to fill the screen: show it whole on a solid colour taken from it.
-      var contained = Boolean(heroImg && !heroImg.sharp);
-      var loading = n === 0 ? 'fetchpriority="high"' : 'loading="lazy"';
       var photos = p.media.filter(function (m) {
         return m.type === "image";
       }).length;
@@ -341,17 +325,14 @@
       var id = "g-" + n;
 
       return (
-        '<section class="place-hero' + (heroImg ? "" : " is-plain") + (contained ? " is-contained" : "") + '">' +
-        (contained
-          ? '<img class="hero-photo" alt="' + esc(pick(c.altText)) + '" ' + loading + ' src="' + esc(heroImg.src) + '"' +
-            (heroImg.width ? ' style="--photo-w:' + Number(heroImg.width) + 'px"' : "") + ">"
-          : heroImg
-          ? '<img alt="' + esc(pick(c.altText)) + '" ' + loading + ' src="' + esc(heroImg.src) + '"' +
+        '<section class="place-hero' + (heroImg ? "" : " is-plain") + '">' +
+        (heroImg
+          ? '<img alt="' + esc(pick(c.altText)) + '" ' + (n === 0 ? 'fetchpriority="high"' : 'loading="lazy"') + ' src="' + esc(heroImg.src) + '"' +
             (heroImg.srcset ? ' srcset="' + esc(heroImg.srcset) + '" sizes="100vw"' : "") + ">"
           : "") +
         '<div class="container place-hero-content' + (n === 0 ? " hero-enter" : "") + '">' +
         '<a class="back-link" href="' + esc(homeHref()) + '">' + TM.icons.arrowLeft + esc(t(journey.filtered ? "journey.backFiltered" : "place.back")) + "</a>" +
-        '<p class="eyebrow"><span class="eyebrow-loc">' + esc(p.city) + " · " + esc(pick(p.country)) + "</span>" +
+        '<p class="eyebrow">' + esc(p.city) + " · " + esc(pick(p.country)) +
         (p.featured ? '<span class="featured-tag">' + TM.icons.crown + esc(t("featured.badge")) + "</span>" : "") +
         '<span class="journey-pos">' + esc(position) + "</span></p>" +
         "<" + Heading + ' class="place-title">' + esc(pick(p.name)) + "</" + Heading + ">" +
@@ -383,8 +364,6 @@
           TM.lightbox.open(p, i, el);
         });
       }
-      var heroPhoto = article.querySelector(".hero-photo");
-      if (heroPhoto) TM.ui.tintFrom(heroPhoto, article.querySelector(".place-hero"));
       TM.ui.wireLazy(article);
       TM.ui.reveal(article);
     }
