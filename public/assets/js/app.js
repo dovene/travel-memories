@@ -103,14 +103,27 @@
 
     slidesEl.innerHTML = slides
       .map(function (s, i) {
+        var load = i === 0 ? 'fetchpriority="high"' : 'loading="lazy"';
+        if (s.mode === "contained") {
+          // Small or portrait picture: shown whole on a solid colour taken from it, never stretched.
+          return (
+            '<div class="hero-slide is-contained' + (i === 0 ? " is-active" : "") + '">' +
+            '<img class="hero-photo" alt="" ' + load + ' src="' + esc(s.image.src) + '"' +
+            (s.image.width ? ' style="--photo-w:' + Number(s.image.width) + 'px"' : "") + ">" +
+            "</div>"
+          );
+        }
         return (
           '<div class="hero-slide' + (i === 0 ? " is-active" : "") + '">' +
-          '<img alt="" ' + (i === 0 ? 'fetchpriority="high"' : 'loading="lazy"') + ' src="' + esc(s.image.src) + '"' +
+          '<img alt="" ' + load + ' src="' + esc(s.image.src) + '"' +
           (s.image.srcset ? ' srcset="' + esc(s.image.srcset) + '" sizes="100vw"' : "") + ">" +
           "</div>"
         );
       })
       .join("");
+    slidesEl.querySelectorAll(".hero-slide.is-contained").forEach(function (slide) {
+      TM.ui.tintFrom(slide.querySelector("img"), slide);
+    });
 
     function renderDots() {
       dotsEl.innerHTML = slides

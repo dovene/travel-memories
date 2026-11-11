@@ -123,26 +123,40 @@
     return null;
   }
 
+  /* The destination's first sharp landscape photo (cover first), or null. */
+  function sharpPhoto(p) {
+    var candidates = [cover(p)].concat(p.media);
+    for (var k = 0; k < candidates.length; k++) {
+      var m = candidates[k];
+      var pic = m && m.type === "image" ? image(m, "display") : null;
+      if (pic && pic.sharp) return pic;
+    }
+    return null;
+  }
+
+  var HERO_MAX = 6;
+
   /*
-   * Up to four destinations for the full-screen homepage hero, in display order (featured
-   * first). Only sharp landscape photos qualify — the cover if it is one, otherwise the
-   * destination's first photo that is. Video frames, portrait and small photos are skipped:
-   * they look soft when stretched across a screen. No qualifying photo → the plain hero.
+   * Homepage hero slides, in display order:
+   *   1. every featured destination (up to the limit): its sharp landscape photo fills the
+   *      screen ("fill"); if it has none, its cover picture is shown whole on a solid colour
+   *      taken from it ("contained") — never stretched;
+   *   2. then sharp landscape photos of other destinations fill the remaining slots.
+   * No slide at all → the plain gradient hero.
    */
   function heroSlides(places) {
     var slides = [];
-    for (var i = 0; i < places.length && slides.length < 4; i++) {
-      var p = places[i];
-      var candidates = [cover(p)].concat(p.media);
-      for (var k = 0; k < candidates.length; k++) {
-        var m = candidates[k];
-        var pic = m && m.type === "image" ? image(m, "display") : null;
-        if (pic && pic.sharp) {
-          slides.push({ place: p, image: pic });
-          break;
-        }
-      }
-    }
+    places.forEach(function (p) {
+      if (!p.featured || slides.length >= HERO_MAX) return;
+      var sharp = sharpPhoto(p);
+      var any = sharp || coverImage(p, "display");
+      if (any) slides.push({ place: p, image: any, mode: sharp ? "fill" : "contained" });
+    });
+    places.forEach(function (p) {
+      if (p.featured || slides.length >= HERO_MAX) return;
+      var sharp = sharpPhoto(p);
+      if (sharp) slides.push({ place: p, image: sharp, mode: "fill" });
+    });
     return slides;
   }
 

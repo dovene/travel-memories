@@ -143,4 +143,14 @@ test("image quality rules: small originals are used as is, only sharp landscape 
   ]);
   assert.deepEqual(Array.from(slides, (s) => s.place.slug), ["featured-video-cover", "good"]);
   assert.equal(slides[0].image.src, "/m?variant=display", "uses the destination's sharp photo, not the video frame");
+  assert.equal(slides[0].mode, "fill");
+
+  // Featured destinations always appear, even without a sharp photo: shown whole ("contained").
+  const withFeaturedSmall = api.heroSlides([
+    place("featured-small", [video], { featured: true }),
+    place("featured-portrait", [photo("p5", 960, 1280)], { featured: true }),
+    place("good", [photo("p4", 2400, 1600)]),
+    place("small", [photo("p2", 1280, 960)]),
+  ]);
+  assert.deepEqual(Array.from(withFeaturedSmall, (s) => s.place.slug + ":" + s.mode), ["featured-small:contained", "featured-portrait:contained", "good:fill"]);
 });

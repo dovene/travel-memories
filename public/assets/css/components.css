@@ -820,3 +820,48 @@
 .place-card .media.is-letterboxed img {
   object-fit: contain;
 }
+
+/* Hero slides with a small or portrait picture: whole picture on a solid colour taken from it. */
+.hero-slide.is-contained {
+  background: var(--tint, var(--navy));
+}
+
+.hero-slide.is-contained img.hero-photo,
+.hero-slide.is-contained.is-active img.hero-photo {
+  --stats-room: calc(var(--space-8) + 110px); /* keeps the picture above the stats row */
+  position: absolute;
+  top: calc(var(--header-h) + var(--space-6));
+  bottom: var(--stats-room);
+  right: var(--gutter);
+  left: auto;
+  width: min(40%, var(--photo-w, 100%));
+  height: auto;
+  max-height: calc(100% - var(--header-h) - var(--space-6) - var(--stats-room));
+  margin: auto 0;
+  object-fit: contain;
+  object-position: right center;
+  border-radius: 6px;
+  filter: drop-shadow(0 30px 60px rgba(0, 0, 0, 0.45));
+  transform: none;
+  animation: none;
+}
+
+/*
+ * Phones and small tablets: the screen is small enough that even small pictures fill it at
+ * about their real size, so these slides simply fill the hero like the others.
+ */
+@media (max-width: 900px) {
+  .hero-slide.is-contained img.hero-photo,
+  .hero-slide.is-contained.is-active img.hero-photo {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    object-fit: cover;
+    object-position: center;
+    border-radius: 0;
+    filter: none;
+  }
+}
