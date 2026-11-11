@@ -311,6 +311,10 @@
     function sectionHtml(p, n) {
       var c = TM.api.cover(p);
       var heroImg = TM.api.coverImage(p, "display");
+      // Too small or portrait to fill the screen: show it whole over a blurred copy of itself.
+      var contained = Boolean(heroImg && !heroImg.sharp);
+      var backdrop = contained ? TM.api.coverImage(p, "thumb") : null;
+      var loading = n === 0 ? 'fetchpriority="high"' : 'loading="lazy"';
       var photos = p.media.filter(function (m) {
         return m.type === "image";
       }).length;
@@ -325,14 +329,18 @@
       var id = "g-" + n;
 
       return (
-        '<section class="place-hero' + (heroImg ? "" : " is-plain") + '">' +
-        (heroImg
-          ? '<img alt="' + esc(pick(c.altText)) + '" ' + (n === 0 ? 'fetchpriority="high"' : 'loading="lazy"') + ' src="' + esc(heroImg.src) + '"' +
+        '<section class="place-hero' + (heroImg ? "" : " is-plain") + (contained ? " is-contained" : "") + '">' +
+        (contained
+          ? '<img class="hero-backdrop" alt="" aria-hidden="true" ' + loading + ' src="' + esc(backdrop.src) + '">' +
+            '<img class="hero-photo" alt="' + esc(pick(c.altText)) + '" ' + loading + ' src="' + esc(heroImg.src) + '"' +
+            (heroImg.width ? ' style="--photo-w:' + Number(heroImg.width) + 'px"' : "") + ">"
+          : heroImg
+          ? '<img alt="' + esc(pick(c.altText)) + '" ' + loading + ' src="' + esc(heroImg.src) + '"' +
             (heroImg.srcset ? ' srcset="' + esc(heroImg.srcset) + '" sizes="100vw"' : "") + ">"
           : "") +
         '<div class="container place-hero-content' + (n === 0 ? " hero-enter" : "") + '">' +
         '<a class="back-link" href="' + esc(homeHref()) + '">' + TM.icons.arrowLeft + esc(t(journey.filtered ? "journey.backFiltered" : "place.back")) + "</a>" +
-        '<p class="eyebrow">' + esc(p.city) + " · " + esc(pick(p.country)) +
+        '<p class="eyebrow"><span class="eyebrow-loc">' + esc(p.city) + " · " + esc(pick(p.country)) + "</span>" +
         (p.featured ? '<span class="featured-tag">' + TM.icons.crown + esc(t("featured.badge")) + "</span>" : "") +
         '<span class="journey-pos">' + esc(position) + "</span></p>" +
         "<" + Heading + ' class="place-title">' + esc(pick(p.name)) + "</" + Heading + ">" +

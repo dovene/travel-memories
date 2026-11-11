@@ -25,6 +25,90 @@
   animation: settle 2.4s var(--ease) forwards;
 }
 
+/*
+ * Covers too small or too tall to fill the screen: the photo is shown whole (never enlarged
+ * past its size) over a blurred, darkened enlargement of itself.
+ */
+.place-hero.is-contained > img.hero-backdrop {
+  inset: -8%;
+  width: 116%;
+  height: 116%;
+  z-index: -3;
+  filter: blur(36px) saturate(1.15) brightness(0.62);
+  transform: none;
+  animation: none;
+}
+
+/* Wide screens: text on the left half, photo on the right half. */
+.place-hero.is-contained .place-hero-content {
+  max-width: min(var(--container), 100%);
+}
+
+.place-hero.is-contained .place-hero-content > * {
+  max-width: 50%;
+}
+
+.place-hero.is-contained > img.hero-photo {
+  inset: calc(var(--header-h) + var(--space-5)) var(--gutter) var(--space-6) auto;
+  width: min(44%, var(--photo-w, 100%));
+  height: auto;
+  max-height: calc(100% - var(--header-h) - var(--space-5) - var(--space-6));
+  object-fit: contain;
+  object-position: right center;
+  margin: auto 0;
+  z-index: -2;
+  transform: none;
+  animation: hero-photo-in 1.2s var(--ease) both;
+  filter: drop-shadow(0 30px 60px rgba(0, 0, 0, 0.45));
+  border-radius: 6px;
+}
+
+@keyframes hero-photo-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+/* Keep the title readable on the left while the photo sits on the right. */
+.place-hero.is-contained::after {
+  background:
+    linear-gradient(90deg, rgba(23, 45, 66, 0.75) 0%, rgba(23, 45, 66, 0.25) 55%, rgba(23, 45, 66, 0) 75%),
+    linear-gradient(0deg, rgba(23, 45, 66, 0.7) 0%, rgba(23, 45, 66, 0) 45%);
+}
+
+/* Narrow screens: photo first, then the text below it — stacked, so they never overlap. */
+@media (max-width: 900px) {
+  .place-hero.is-contained {
+    min-height: 0;
+    align-items: start;
+    align-content: start;
+    padding-top: calc(var(--header-h) + var(--space-4));
+  }
+
+  .place-hero.is-contained > img.hero-photo {
+    position: static;
+    justify-self: center;
+    width: auto;
+    max-width: calc(100% - 2 * var(--gutter));
+    max-height: 56svh;
+    margin: 0;
+  }
+
+  .place-hero.is-contained .place-hero-content {
+    padding-top: var(--space-5);
+    padding-bottom: var(--space-7);
+  }
+
+  .place-hero.is-contained .place-hero-content > * {
+    max-width: none;
+  }
+
+  .place-hero.is-contained::after {
+    background: linear-gradient(0deg, rgba(23, 45, 66, 0.85) 0%, rgba(23, 45, 66, 0.2) 45%, rgba(23, 45, 66, 0) 70%);
+  }
+}
+
 @keyframes settle {
   to {
     transform: scale(1);
@@ -266,7 +350,16 @@
 
 .place-hero .eyebrow {
   display: flex;
+  flex-wrap: wrap;
+  row-gap: var(--space-2);
   width: 100%;
+}
+
+/* Location, "Featured" and position wrap as whole pieces, never mid-text. */
+.eyebrow-loc,
+.featured-tag,
+.journey-pos {
+  white-space: nowrap;
 }
 
 .journey-empty {

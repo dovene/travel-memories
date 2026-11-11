@@ -454,6 +454,7 @@
           '<button type="button" class="mm-btn danger" data-act="remove" aria-label="Remove ' + esc(name) + '">' + I.trash + "</button>" +
           "</div></div>" +
           '<div class="mm-bottom"><span class="mm-pos">' + (i + 1) + "</span>" +
+          lowResBadge(m) +
           (isCover ? '<span class="cover-badge">Cover</span>' : '<span class="mm-type">' + (m.type === "video" ? I.video + "Video" : "") + "</span>") +
           "</div></div>"
         );
@@ -468,6 +469,17 @@
         img.replaceWith(label);
       });
     });
+  }
+
+  /*
+   * Small media look soft when shown large (hero, cover, fullscreen). Thresholds: photos under
+   * 1600 px on their long side, videos under 1280 px. Messaging apps often shrink photos this way.
+   */
+  function lowResBadge(m) {
+    var long = Math.max(m.width || 0, m.height || 0);
+    if (!long || long >= (m.type === "video" ? 1280 : 1600)) return "";
+    var tip = m.width + "×" + m.height + " px — may look soft in large views. Upload the original (not a messaging-app copy) for full sharpness.";
+    return '<span class="lowres" title="' + esc(tip) + '">Low res</span>';
   }
 
   /* Queued files of a new destination: local previews only, nothing has been sent yet. */
@@ -651,6 +663,14 @@
    * Formats the browser cannot decode (e.g. HEIC outside Safari) keep their original only.
    */
   var PREVIEW_SIZES = { thumb: 640, display: 2048, poster: 1600 };
+  var WEB_SAFE = { "image/jpeg": true, "image/png": true, "image/webp": true, "image/avif": true };
+
+  /* Previews a media item needs. A small, web-friendly original is shown as it is (no display copy). */
+  function previewsFor(m) {
+    if (m.type === "video") return ["poster"];
+    var small = WEB_SAFE[m.contentType] && m.width && m.height && Math.max(m.width, m.height) <= PREVIEW_SIZES.display;
+    return small ? ["thumb"] : ["thumb", "display"];
+  }
 
   function scaleTo(source, sw, sh, maxSide) {
     var ratio = Math.min(1, maxSide / Math.max(sw, sh));
@@ -730,7 +750,7 @@
   /* Creates and uploads the missing previews of one media item; resolves with the latest place. */
   function makePreviews(placeId, media, blob) {
     var have = media.variants || {};
-    var wanted = media.type === "video" ? ["poster"] : ["thumb", "display"];
+    var wanted = previewsFor(media);
     var missing = wanted.filter(function (n) {
       return !have[n];
     });
@@ -762,7 +782,9 @@
   var attempted = {};
   function backfillPreviews(place) {
     place.media.forEach(function (m) {
-      var needs = m.type === "video" ? !(m.variants && m.variants.poster) : !(m.variants && m.variants.thumb && m.variants.display);
+      var needs = previewsFor(m).some(function (name) {
+        return !(m.variants && m.variants[name]);
+      });
       if (!needs || attempted[m.id]) return;
       attempted[m.id] = true;
       queue = queue.then(function () {
