@@ -370,12 +370,32 @@
       }
       var play = article.querySelector("[data-play]");
       if (play) {
+        glowWhenSeen(play);
         play.addEventListener("click", function () {
           TM.slideshow.open(p, { from: play, next: nextAfter(article) });
         });
       }
       TM.ui.wireLazy(article);
       TM.ui.reveal(article);
+    }
+
+    /* The Play button glows briefly the first time its cover comes into view. */
+    var glowObserver =
+      "IntersectionObserver" in window
+        ? new IntersectionObserver(
+            function (entries) {
+              entries.forEach(function (e) {
+                if (!e.isIntersecting) return;
+                e.target.classList.add("is-glowing");
+                glowObserver.unobserve(e.target);
+              });
+            },
+            { threshold: 1 }
+          )
+        : null;
+
+    function glowWhenSeen(button) {
+      if (glowObserver) glowObserver.observe(button);
     }
 
     /*

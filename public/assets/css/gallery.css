@@ -638,6 +638,29 @@ body.lb-locked {
   transform: scale(1.07);
 }
 
+/* A soft ring, twice, the first time the cover is seen. */
+.hero-play-orb {
+  position: relative;
+}
+
+.hero-play.is-glowing .hero-play-orb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: play-glow 1.6s var(--ease) 1.2s 2 both;
+}
+
+@keyframes play-glow {
+  from {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.6);
+  }
+  to {
+    box-shadow: 0 0 0 18px rgba(255, 255, 255, 0);
+  }
+}
+
 .hero-play-orb svg {
   width: 16px;
   height: 16px;

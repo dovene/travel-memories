@@ -1,7 +1,8 @@
 /*
  * Slideshow ("Play" on a destination's cover): every photo and video of the destination,
  * one after another, full screen, like stories.
- *  - Photos stay about 5 seconds, videos play to the end (with sound when the browser allows).
+ *  - Photos stay about 5 seconds, videos play to the end. It starts muted; turning sound on
+ *    is remembered for the next slideshows.
  *  - Progress bars on top; tap the right side for next, left side for previous;
  *    press and hold to pause; swipe down to close.
  *  - Keyboard: Space pauses, arrows skip, M toggles sound, Esc closes.
@@ -28,7 +29,8 @@
   var paused = false;
   var held = false;
   var ended = false;
-  var muted = false;
+  var SOUND_KEY = "tm.slideshowSound";
+  var muted = soundPreference() !== "on"; // starts muted unless the visitor turned sound on before
   var elapsed = 0;
   var lastFrame = 0;
   var raf = 0;
@@ -74,7 +76,7 @@
       setPaused(!paused);
     });
     muteBtn.addEventListener("click", function () {
-      setMuted(!muted);
+      setMuted(!muted, true);
     });
     closeBtn.addEventListener("click", close);
     replayBtn.addEventListener("click", function () {
@@ -115,6 +117,14 @@
     nextBtn.hidden = !next;
     if (next) nextBtn.querySelector("span").textContent = t("slideshow.next", { name: TM.i18n.pick(next.place.name) });
     if (items[index]) counterEl.textContent = t("viewer.counter", { i: index + 1, n: items.length });
+  }
+
+  function soundPreference() {
+    try {
+      return localStorage.getItem(SOUND_KEY);
+    } catch (e) {
+      return null;
+    }
   }
 
   /* ---------- slides ---------- */
@@ -271,8 +281,16 @@
     apply();
   }
 
-  function setMuted(m) {
+  /* The visitor's own choice is remembered; a browser refusing sound is not. */
+  function setMuted(m, remember) {
     muted = m;
+    if (remember) {
+      try {
+        localStorage.setItem(SOUND_KEY, m ? "off" : "on");
+      } catch (e) {
+        /* private mode: the choice lasts for this visit only */
+      }
+    }
     slides.forEach(function (s) {
       if (s && s.video) s.video.muted = m;
     });
@@ -307,7 +325,7 @@
     else if ((e.key === " " || e.key === "k") && !e.target.closest(".ss-end, button")) {
       e.preventDefault();
       if (!ended) setPaused(!paused);
-    } else if (e.key === "m" || e.key === "M") setMuted(!muted);
+    } else if (e.key === "m" || e.key === "M") setMuted(!muted, true);
     else if (e.key === "Tab") {
       var f = Array.prototype.filter.call(root.querySelectorAll("button"), function (el) {
         return !el.disabled && el.offsetParent !== null;
