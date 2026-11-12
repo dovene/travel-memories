@@ -451,6 +451,7 @@
           '<button type="button" class="mm-handle" aria-label="Reorder ' + esc(name) + " (position " + (i + 1) + " of " + n + '). Use arrow keys to move.">' + I.grip + "</button>" +
           '<div class="mm-actions">' +
           '<button type="button" class="mm-btn' + (isCover ? " is-on" : "") + '" data-act="cover" aria-pressed="' + isCover + '" aria-label="Use as cover">' + (isCover ? I.starFill : I.star) + "</button>" +
+          '<a class="mm-btn" href="' + esc(m.url) + '" download="' + esc(m.originalFilename || m.filename || "") + '" aria-label="Download ' + esc(name) + '" title="Download original">' + I.download + "</a>" +
           '<button type="button" class="mm-btn danger" data-act="remove" aria-label="Remove ' + esc(name) + '">' + I.trash + "</button>" +
           "</div></div>" +
           '<div class="mm-bottom"><span class="mm-pos">' + (i + 1) + "</span>" +
