@@ -21,7 +21,7 @@ export const LIMITS = {
 };
 export const MAX_MEDIA_PER_PLACE = 500;
 
-const TYPES = {
+export const TYPES = {
   "image/jpeg": { kind: "image", ext: "jpg", exts: ["jpg", "jpeg"] },
   "image/png": { kind: "image", ext: "png", exts: ["png"] },
   "image/webp": { kind: "image", ext: "webp", exts: ["webp"] },
@@ -52,7 +52,7 @@ export function sniff(head) {
 }
 
 /* Families that may legitimately be declared one way and detected another (e.g. .mov holding MP4). */
-function compatible(declared, detected) {
+export function compatible(declared, detected) {
   if (declared === detected) return true;
   const pair = new Set([declared, detected]);
   return (pair.has("video/mp4") && pair.has("video/quicktime")) || (pair.has("image/heic") && pair.has("image/avif"));
@@ -103,7 +103,7 @@ export function inspectUploadRequest(request) {
  * Reads the first bytes for sniffing, then returns a stream that replays them followed by
  * the rest of the body, with an exact length (R2 needs a known length for streamed puts).
  */
-async function peek(body, size, want = 32) {
+export async function peek(body, size, want = 32) {
   const reader = body.getReader();
   const chunks = [];
   let have = 0;

@@ -553,6 +553,23 @@
       });
   }
 
+  /*
+   * One anonymous page-view beacon per page load, for the owner's Visitors page.
+   * No cookie and nothing stored in the browser; the server never keeps the IP address.
+   */
+  function sendVisit(page, slug) {
+    try {
+      fetch("/api/public/" + encodeURIComponent(TM.api.config.username) + "/visits", {
+        method: "POST",
+        keepalive: true,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ page: page, slug: slug || undefined, lang: TM.i18n.lang, ref: document.referrer || undefined })
+      }).catch(function () {});
+    } catch (e) {
+      /* statistics must never break the page */
+    }
+  }
+
   /* "Try again" buttons (no inline handlers: the Content-Security-Policy forbids them). */
   document.addEventListener("click", function (e) {
     if (e.target.closest && e.target.closest("[data-reload]")) location.reload();
@@ -568,7 +585,13 @@
     // Static elements marked .reveal also fade in on scroll.
     TM.ui.reveal(document);
     var page = document.body.getAttribute("data-page");
-    if (page === "home") initHome();
-    if (page === "place") initPlace();
+    if (page === "home") {
+      initHome();
+      sendVisit("home");
+    }
+    if (page === "place") {
+      initPlace();
+      sendVisit("place", new URLSearchParams(location.search).get("slug"));
+    }
   });
 })();

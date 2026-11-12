@@ -109,3 +109,26 @@ test("the journey follows the list the visitor came from", () => {
   assert.equal(outside.list.length, places.length, "a link outside the filter falls back to the full list");
   assert.equal(TM.filters.journey(places, "atlantis", {}), null);
 });
+
+test("backup archives: tar headers round-trip, including long paths", async () => {
+  const ctx = { window: {}, TextEncoder, TextDecoder, Blob };
+  vm.runInNewContext(readFileSync(new URL("../public/assets/js/tar.js", import.meta.url), "utf8"), ctx);
+  const tar = ctx.window.TM.tar;
+  const top = "travel-memories-production-2026-11-12T10-00";
+  const files = [
+    [`${top}/content/users/dovene/places.json`, new TextEncoder().encode('{"a":1}')],
+    [`${top}/media/users/dovene/kwame-nkrumah-memorial-park-2025/img-abcdefghij.display-k3x9q2.jpg`, new Uint8Array(1000).fill(7)],
+    [`${top}/__MACOSX/._junk`, new Uint8Array(3)],
+  ];
+  const parts = [];
+  for (const [path, bytes] of files) parts.push(tar.header(path, bytes.length, Date.now()), bytes, tar.padding(bytes.length));
+  parts.push(tar.end());
+  const blob = new Blob(parts);
+  assert.equal(blob.size % 512, 0);
+  const entries = Array.from(await tar.list(blob));
+  assert.deepEqual(entries.map((e) => e.path), files.slice(0, 2).map((f) => f[0]), "macOS metadata skipped");
+  assert.equal(await entries[0].blob.text(), '{"a":1}');
+  assert.equal(entries[1].size, 1000);
+  assert.ok(files[1][0].length > 100, "the long path used the prefix field");
+  await assert.rejects(() => tar.list(new Blob([new Uint8Array(512).fill(65)])), /not a tar file/);
+});

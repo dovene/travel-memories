@@ -47,7 +47,7 @@ export async function handleApi(request, env, ctx, deps = { getSession }) {
       if (request.method !== "GET" && request.method !== "HEAD") return methodNotAllowed(["GET", "HEAD"]);
       return await health(env);
     }
-    if (pathname.startsWith("/api/public/")) return await handlePublic(request, env, segmentsOf(pathname, "/api/public/"));
+    if (pathname.startsWith("/api/public/")) return await handlePublic(request, env, segmentsOf(pathname, "/api/public/"), ctx, deps.getSession);
     if (pathname.startsWith("/api/admin/")) return await handleAdmin(request, env, segmentsOf(pathname, "/api/admin/"), deps);
     return notFound();
   } catch (err) {

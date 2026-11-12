@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Visitors — Travel Memories admin</title>
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#172D42" />
+    <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../assets/css/main.css" />
+    <link rel="stylesheet" href="../assets/css/components.css" />
+    <link rel="stylesheet" href="../assets/css/admin.css" />
+  </head>
+  <body class="admin admin-tool">
+    <header class="admin-bar">
+      <div class="inner">
+        <div style="display: flex; align-items: center; gap: var(--space-2)">
+          <a class="brand" href="/admin/">
+            <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+              <circle cx="20" cy="20" r="19" fill="none" stroke="currentColor" stroke-width="1.4" />
+              <circle cx="26" cy="14" r="3.6" fill="currentColor" />
+              <path d="M7 28 15 18l5 6 4-4 9 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" />
+            </svg>
+            <span class="brand-text">Travel Memories</span> <small>Studio</small>
+          </a>
+        </div>
+        <nav class="admin-nav" aria-label="Admin sections">
+          <a href="/admin/" data-icon="pin"><span>Destinations</span></a>
+          <a href="/admin/visitors" aria-current="page" data-icon="chart"><span>Visitors</span></a>
+          <a href="/admin/backups" data-icon="archive"><span>Backups</span></a>
+        </nav>
+        <div class="actions">
+          <a class="btn btn-sm hide-sm" id="view-live" href="../index.html" target="_blank" rel="noopener">View site</a>
+          <a class="btn btn-sm" href="/admin/login" id="logout">Sign out</a>
+          <span class="avatar" id="avatar" aria-hidden="true"></span>
+        </div>
+      </div>
+    </header>
+
+    <main class="admin-page" id="visitors">
+      <div class="editor-head">
+        <div>
+          <p class="crumbs">Studio / Visitors</p>
+          <h1>Visitors</h1>
+        </div>
+        <div class="tabs" role="group" aria-label="Period" id="range">
+          <button type="button" data-days="7" aria-pressed="false">7 days</button>
+          <button type="button" data-days="30" aria-pressed="true">30 days</button>
+          <button type="button" data-days="90" aria-pressed="false">90 days</button>
+        </div>
+      </div>
+
+      <div class="stat-grid" id="stats" aria-live="polite"></div>
+
+      <section class="panel" aria-labelledby="daily-title">
+        <div class="panel-head">
+          <div>
+            <h2 id="daily-title">Visits per day</h2>
+            <p id="daily-sub">Page views of the public site, by day (UTC).</p>
+          </div>
+        </div>
+        <div class="chart-wrap" id="chart"></div>
+      </section>
+
+      <div class="panel-grid">
+        <section class="panel" aria-labelledby="cities-title">
+          <div class="panel-head"><h2 id="cities-title">Cities</h2></div>
+          <div id="cities"></div>
+        </section>
+        <section class="panel" aria-labelledby="countries-title">
+          <div class="panel-head"><h2 id="countries-title">Countries</h2></div>
+          <div id="countries"></div>
+        </section>
+        <section class="panel" aria-labelledby="places-title">
+          <div class="panel-head"><h2 id="places-title">Destinations opened</h2></div>
+          <div id="places"></div>
+        </section>
+        <section class="panel" aria-labelledby="sources-title">
+          <div class="panel-head"><h2 id="sources-title">Coming from</h2></div>
+          <div id="sources"></div>
+        </section>
+      </div>
+
+      <section class="panel" aria-labelledby="recent-title">
+        <div class="panel-head">
+          <div>
+            <h2 id="recent-title">Latest visits</h2>
+            <p>Your own visits while signed in are not counted. IP addresses are never stored: a visitor is recognised for one day only, by an anonymous code.</p>
+          </div>
+        </div>
+        <div id="recent"></div>
+      </section>
+    </main>
+
+    <script src="../assets/js/icons.js"></script>
+    <script src="../assets/js/i18n/en.js"></script>
+    <script src="../assets/js/i18n.js"></script>
+    <script src="../assets/js/gallery.js"></script>
+    <script src="../assets/js/admin-shell.js"></script>
+    <script src="../assets/js/admin-visitors.js"></script>
+  </body>
+</html>

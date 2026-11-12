@@ -946,6 +946,44 @@ dialog.confirm .buttons {
   display: none;
 }
 
+/* ---------- Admin sections (Destinations · Visitors · Backups) ---------- */
+.admin-nav {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.admin-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.78);
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.admin-nav a:hover {
+  color: var(--white);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.admin-nav a[aria-current="page"] {
+  color: var(--navy);
+  background: var(--white);
+}
+
+.admin-nav svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 960px) {
   .login {
@@ -991,6 +1029,19 @@ dialog.confirm .buttons {
     background: rgba(255, 255, 255, 0.12);
   }
 
+  .admin-nav a {
+    padding: 0 var(--space-3);
+  }
+
+  .admin-nav a span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
   .save-bar {
     left: 0;
   }
@@ -1006,6 +1057,7 @@ dialog.confirm .buttons {
   }
 
   .admin-bar .brand small,
+  .admin-bar .brand-text,
   .admin-bar .avatar,
   .admin-bar .hide-sm {
     display: none;
@@ -1060,4 +1112,250 @@ dialog.confirm .buttons {
 .list-crown svg {
   width: 16px;
   height: 16px;
+}
+
+/* ---------- Visitors & Backups pages ---------- */
+.admin-page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: var(--space-6) clamp(1rem, 3vw, 3rem) var(--space-8);
+  display: grid;
+  gap: var(--space-5);
+  align-content: start;
+}
+
+.admin-page .tabs button[aria-pressed="true"] {
+  background: var(--white);
+  color: var(--navy);
+  box-shadow: var(--shadow-sm);
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.stat-grid.is-loading {
+  opacity: 0.5;
+}
+
+.stat-tile {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-5);
+  display: grid;
+  gap: 2px;
+}
+
+.stat-label {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.stat-value {
+  font-family: var(--font-display);
+  font-size: var(--fs-2xl);
+  font-weight: 400;
+  line-height: 1.1;
+  color: var(--navy);
+}
+
+.stat-note {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.chart-wrap {
+  position: relative;
+}
+
+.chart-wrap svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.chart-wrap .grid {
+  stroke: var(--navy-06);
+  stroke-width: 1;
+}
+
+.chart-wrap .baseline {
+  stroke: var(--navy-12);
+  stroke-width: 1;
+}
+
+.chart-wrap .axis {
+  font-size: 12px;
+  fill: var(--text-muted);
+  font-family: var(--font-body);
+}
+
+.chart-wrap .hit {
+  fill: transparent;
+  cursor: default;
+}
+
+.chart-wrap .hit.is-hover {
+  fill: var(--navy-06);
+}
+
+.chart-tip {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  display: grid;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--navy);
+  color: var(--white);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: var(--shadow);
+}
+
+.chart-tip strong {
+  font-size: var(--fs-sm);
+}
+
+.panel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.data-table th {
+  text-align: left;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0 var(--space-2) var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.data-table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--navy-06);
+  vertical-align: middle;
+}
+
+.data-table td:first-child {
+  position: relative;
+}
+
+.data-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  width: 1%;
+  white-space: nowrap;
+}
+
+/* A faint bar behind each row's label shows its share at a glance. */
+.cell-bar {
+  position: absolute;
+  inset: 4px auto 4px 0;
+  width: var(--w);
+  border-radius: 0 4px 4px 0;
+  background: var(--ocean-100);
+}
+
+.cell-text {
+  position: relative;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.table-more,
+.empty-note {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.data-table.recent td {
+  white-space: nowrap;
+}
+
+#recent {
+  overflow-x: auto;
+}
+
+.backup-summary {
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.backup-actions label.btn {
+  cursor: pointer;
+}
+
+.restore-check {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  background: var(--sky);
+  font-size: var(--fs-sm);
+}
+
+.progress {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.progress[hidden] {
+  display: none;
+}
+
+.progress-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--navy-06);
+  overflow: hidden;
+}
+
+.progress-bar i {
+  display: block;
+  height: 100%;
+  background: var(--ocean);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 300ms var(--ease);
+}
+
+.progress-text {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+@media (max-width: 900px) {
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .panel-grid {
+    grid-template-columns: 1fr;
+  }
 }

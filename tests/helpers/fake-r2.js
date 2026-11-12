@@ -92,7 +92,7 @@ export class FakeR2 {
     const start = cursor ? Number(cursor) : 0;
     const page = all.slice(start, start + limit);
     const truncated = start + limit < all.length;
-    return { objects: page.map((k) => ({ key: k })), truncated, cursor: truncated ? String(start + limit) : undefined };
+    return { objects: page.map((k) => ({ key: k, size: this.objects.get(k).bytes.length })), truncated, cursor: truncated ? String(start + limit) : undefined };
   }
 
   /* Test helpers */

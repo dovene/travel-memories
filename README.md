@@ -127,6 +127,7 @@ Errors always look like `{ "error": { "code", "message", "details?" } }`. Valida
 | `GET /api/public/:username/places` | `{ places: [...] }` with media `url`s, ordered by position |
 | `GET /api/public/:username/places/:slug` | One place |
 | `GET /api/public/:username/media/:mediaId[?variant=thumb\|display\|poster]` | The original file, or a preview. Supports `Range` (video seeking) and `If-None-Match`, and is cached long-term |
+| `POST /api/public/:username/visits` | Page-view beacon `{ page: "home"\|"place", slug?, lang?, ref? }`. Same-origin only, answers `204` |
 
 JSON responses carry an `ETag` and answer `304` when unchanged.
 
@@ -145,6 +146,10 @@ JSON responses carry an `ETag` and answer `304` when unchanged.
 | `PUT /api/admin/places/:id/media/order` | `{ order: [ids] }`. It must list exactly the current media, otherwise `409` with `currentOrder` |
 | `PUT /api/admin/places/:id/media/cover` | `{ mediaId }` |
 | `PUT /api/admin/places/:id/media/:mediaId/variants/:name` | A preview (`thumb`, `display` or `poster`): raw JPEG/WEBP/PNG body with `X-Media-Width` and `X-Media-Height` |
+| `GET /api/admin/visits?from=yyyy-mm-dd&to=yyyy-mm-dd` | Raw visits of at most 31 days per call |
+| `GET /api/admin/backup/content` | The username, profile and places documents, byte for byte |
+| `POST /api/admin/backup/existing` | `{ paths }` → `{ existing: { path: size } }` for media already stored |
+| `PUT /api/admin/backup/files?path=…` | One restored file (raw body). Only the signed-in owner's paths; documents must pass the schemas, media must match their type |
 
 ### Seeding a bucket
 
@@ -175,6 +180,24 @@ npm run restore -- --from exports/<folder> --target production --yes --force
   - it uploads media first and `places.json` last, so the site never points to a missing file.
 - **Tested:** a full staging export (16 files) was restored into local storage, and the local site then served all 13 media files byte-identical to the export.
 - **Routine:** run an export regularly, for example monthly or after a trip, and keep copies somewhere other than Cloudflare. The spec's long-term preservation goal depends on this.
+
+### From the admin panel
+
+**Studio › Backups** does the same without a terminal:
+
+- **Download backup:** one `.tar` file (opens with a double-click on macOS and Windows) holding exactly the folder `npm run export` produces: `content/…`, `media/…`, `manifest.json` with SHA-256 checksums and a `README.md`. The browser builds it: it reads the content documents from the API and downloads every file from its public URL. Chrome and Edge write it straight to disk; other browsers assemble it in memory first (fine at today's size of about 0.5 GB).
+- **Restore a backup:** choose a downloaded `.tar`, or a folder made by `npm run export`. Every file is checked against the manifest (size and SHA-256) before anything is uploaded. Media already stored are skipped, the rest is uploaded one file per request, and `places.json` goes last, so the site only switches over once every file is there. The confirmation says how many destinations the backup has and what will disappear.
+- **Why the browser does the work:** on the Workers free plan a request may make about 50 storage operations and use 10 ms of CPU, far too little to pack or unpack hundreds of files in one request.
+- **Tested locally:** downloaded the local journal (27 files), deleted a video and renamed a destination, restored the `.tar`: one file uploaded, the name and the video came back.
+
+## Visitors
+
+**Studio › Visitors** shows page views of the public site for the last 7, 30 or 90 days: visits, visitors, countries and cities, a daily chart, the cities, countries and destinations, the sites visitors came from, and the latest visits.
+
+- Each page load sends one small beacon (`POST /api/public/:username/visits`). The Worker adds the city, region and country Cloudflare knows for the request, and the device type, and appends it to `visits/users/<ownerId>/<yyyy-mm-dd>.json` in R2.
+- **Not stored:** IP addresses. A visitor is counted with an anonymous code (a keyed hash of IP + browser) that changes every day, so the same person on two days counts twice.
+- **Not counted:** your own visits while signed in, and obvious bots.
+- At most 20,000 visits are kept per day; visit files are not part of backups.
 
 ## Security headers and accessibility
 

@@ -15,6 +15,10 @@
  *   PUT    /api/admin/places/:id/media/order      { order: [mediaId, ...] }
  *   PUT    /api/admin/places/:id/media/cover      { mediaId }
  *   PUT    /api/admin/places/:id/media/:mediaId/variants/:name   preview image (thumb|display|poster)
+ *   GET    /api/admin/visits?from=yyyy-mm-dd&to=yyyy-mm-dd   (at most 31 days per call)
+ *   GET    /api/admin/backup/content              the content documents, for the browser-built export
+ *   POST   /api/admin/backup/existing             { paths } → which media files are already stored
+ *   PUT    /api/admin/backup/files?path=…         one restored file (raw body)
  */
 import { ApiError, json, methodNotAllowed, SECURITY_HEADERS } from "../utils/responses.js";
 import { ContentStore } from "../services/storage.js";
@@ -25,6 +29,8 @@ import {
 import { authenticate, clearedSessionCookie, createSessionToken, isConfigured, sessionCookie } from "../services/auth.js";
 import { MAX_MEDIA_PER_PLACE, storeUpload, storeVariant } from "../services/uploads.js";
 import { mediaBaseUrl, presentPlace } from "./public.js";
+import { readVisits } from "../services/visits.js";
+import { existingMedia, exportContent, restoreFile } from "../services/backup.js";
 
 const MAX_BODY_BYTES = 64 * 1024;
 
@@ -41,13 +47,13 @@ export function parseIfMatch(request) {
   return Number(m[1]);
 }
 
-async function readJsonBody(request) {
+async function readJsonBody(request, max = MAX_BODY_BYTES) {
   const type = request.headers.get("Content-Type") || "";
   if (!type.toLowerCase().startsWith("application/json")) throw new ApiError(415, "unsupported_media_type", "Send JSON (Content-Type: application/json).");
   const declared = Number(request.headers.get("Content-Length") || 0);
-  if (declared > MAX_BODY_BYTES) throw new ApiError(413, "body_too_large", "Request body is too large.");
+  if (declared > max) throw new ApiError(413, "body_too_large", "Request body is too large.");
   const text = await request.text();
-  if (text.length > MAX_BODY_BYTES) throw new ApiError(413, "body_too_large", "Request body is too large.");
+  if (text.length > max) throw new ApiError(413, "body_too_large", "Request body is too large.");
   try {
     return JSON.parse(text);
   } catch {
@@ -107,6 +113,30 @@ export async function handleAdmin(request, env, segments, { getSession }) {
 
   if (!session) throw new ApiError(401, "unauthorized", "Sign in to continue.");
   requireSameOrigin(request);
+  if (!env.STORAGE) throw new ApiError(503, "storage_unavailable", "Storage is not configured.");
+
+  if (resource === "visits" && id === undefined) {
+    if (request.method !== "GET") return methodNotAllowed(["GET"]);
+    const q = new URL(request.url).searchParams;
+    return json({ from: q.get("from"), to: q.get("to"), visits: await readVisits(env.STORAGE, session.ownerId, q.get("from"), q.get("to")) });
+  }
+
+  if (resource === "backup" && sub === undefined) {
+    if (id === "content") {
+      if (request.method !== "GET") return methodNotAllowed(["GET"]);
+      return json(await exportContent(env.STORAGE, session, env));
+    }
+    if (id === "existing") {
+      if (request.method !== "POST") return methodNotAllowed(["POST"]);
+      const body = await readJsonBody(request, 4 * 1024 * 1024);
+      return json({ existing: await existingMedia(env.STORAGE, session, body && body.paths) });
+    }
+    if (id === "files") {
+      if (request.method !== "PUT") return methodNotAllowed(["PUT"]);
+      return json(await restoreFile(env.STORAGE, session, new URL(request.url).searchParams.get("path"), request));
+    }
+  }
+
   if (resource !== "places" || beyond !== undefined) throw new ApiError(404, "not_found", "Resource not found.");
 
   const ownerId = session.ownerId;
