@@ -223,6 +223,10 @@ describe("preview variants", () => {
     assert.deepEqual(new Uint8Array(await served.arrayBuffer()), THUMB);
     const pub = await (await call("GET", `/api/public/dovene/places/${place.slug}`)).json();
     assert.equal(pub.media[0].variants.thumb.url, thumb.url);
+    // Visitors never receive file names; the alt text is the destination name and position.
+    const text = JSON.stringify(pub);
+    assert.doesNotMatch(text, /originalFilename|"filename"|\.(jpe?g|mp4|webp)"/i);
+    assert.equal(pub.media[0].altText.en, `${place.name.en} · 1`);
   });
 
   test("regenerating a preview replaces the file and changes the URL", async () => {

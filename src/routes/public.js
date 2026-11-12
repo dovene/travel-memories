@@ -41,18 +41,28 @@ export function mediaBaseUrl(env, username) {
   return template.replace("{username}", encodeURIComponent(username)).replace(/\/$/, "");
 }
 
-export function presentPlace(place, base) {
+/*
+ * Visitors never see file names: for the public site (`isPublic`), stored and original file
+ * names are left out and the alt text (which defaults to the file name) becomes
+ * "<destination name> · <position>". The admin keeps everything.
+ */
+export function presentPlace(place, base, { isPublic = false } = {}) {
   const media = [...place.media]
     .sort((a, b) => a.position - b.position)
-    .map((m) => {
+    .map((m, i) => {
       const url = `${base}/${encodeURIComponent(m.id)}`;
       const variants = {};
       for (const [name, v] of Object.entries(m.variants || {})) {
         // The token in the stored name changes when a preview is regenerated, so the URL does too.
         const token = (v.filename.match(/-([a-z0-9]+)\.[a-z]+$/) || [])[1] || "1";
         variants[name] = { ...v, url: `${url}?variant=${name}&v=${token}` };
+        if (isPublic) delete variants[name].filename;
       }
-      return { ...m, url, variants };
+      if (!isPublic) return { ...m, url, variants };
+      const { filename, originalFilename, altText, ...rest } = m;
+      const alt = {};
+      for (const [lang, name] of Object.entries(place.name || {})) if (name) alt[lang] = `${name} · ${i + 1}`;
+      return { ...rest, altText: alt, url, variants };
     });
   return { ...place, media };
 }
@@ -140,10 +150,11 @@ export async function handlePublic(request, env, segments, ctx, getSession) {
   if (resource === "places") {
     const { data, etag } = await store.getPlaces(ownerId);
     const base = mediaBaseUrl(env, username);
-    if (id === undefined) return cachedJson(request, { places: sortPlaces(data.places).map((p) => presentPlace(p, base)) }, etag);
+    const tag = etag && `${etag}-p2`; // bump the suffix whenever the public shape changes, so cached copies refresh
+    if (id === undefined) return cachedJson(request, { places: sortPlaces(data.places).map((p) => presentPlace(p, base, { isPublic: true })) }, tag);
     const place = data.places.find((p) => p.slug === id);
     if (!place) throw new ApiError(404, "not_found", "Destination not found.");
-    return cachedJson(request, presentPlace(place, base), etag && `${etag}-${place.id}`);
+    return cachedJson(request, presentPlace(place, base, { isPublic: true }), tag && `${tag}-${place.id}`);
   }
 
   if (resource === "media" && id !== undefined) return serveMedia(request, store, ownerId, id, new URL(request.url).searchParams.get("variant"));

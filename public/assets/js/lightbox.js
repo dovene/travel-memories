@@ -140,7 +140,7 @@
   function update() {
     var m = items[index];
     counter.textContent = t("viewer.counter", { i: index + 1, n: items.length });
-    caption.textContent = TM.i18n.pick(m.altText);
+    caption.textContent = ""; // no captions: the alt text is only for screen readers
     titleEl.textContent = TM.i18n.pick(place.name);
     prevBtn.disabled = index === 0;
     nextBtn.disabled = index === items.length - 1;
