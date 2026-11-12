@@ -336,6 +336,10 @@
         (p.featured ? '<span class="featured-tag">' + TM.icons.crown + esc(t("featured.badge")) + "</span>" : "") +
         '<span class="journey-pos">' + esc(position) + "</span></p>" +
         "<" + Heading + ' class="place-title">' + esc(pick(p.name)) + "</" + Heading + ">" +
+        (p.media.length > 1
+          ? '<button type="button" class="hero-play" data-play aria-label="' + esc(t("slideshow.playLabel", { name: pick(p.name) })) + '">' +
+            '<span class="hero-play-orb">' + TM.icons.play + '</span><span class="hero-play-text">' + esc(t("slideshow.play")) + "</span></button>"
+          : "") +
         "</div></section>" +
         '<div class="container">' +
         '<section class="place-intro">' +
@@ -364,8 +368,43 @@
           TM.lightbox.open(p, i, el);
         });
       }
+      var play = article.querySelector("[data-play]");
+      if (play) {
+        play.addEventListener("click", function () {
+          TM.slideshow.open(p, { from: play, next: nextAfter(article) });
+        });
+      }
       TM.ui.wireLazy(article);
       TM.ui.reveal(article);
+    }
+
+    /*
+     * The destination after this section in the journey, for the slideshow's end screen:
+     * "Next" scrolls the page to it (adding it if needed) and plays its slideshow.
+     */
+    function nextAfter(article) {
+      if (journey.list.length < 2) return null;
+      var p = journey.list[(journey.list.indexOf(journey.list.filter(function (x) {
+        return x.slug === article.getAttribute("data-slug");
+      })[0]) + 1) % journey.list.length];
+      return {
+        place: p,
+        go: function () {
+          var el = article.nextElementSibling;
+          while (el && !el.classList.contains("journey-item")) {
+            if (el === sentinel) {
+              appendNext();
+              el = article.nextElementSibling;
+              continue;
+            }
+            el = el.nextElementSibling;
+          }
+          if (!el) return;
+          window.scrollTo({ top: el.getBoundingClientRect().top + window.pageYOffset, behavior: "instant" });
+          var play = el.querySelector("[data-play]");
+          if (play) play.click();
+        }
+      };
     }
 
     /* Adds the next destination (and, when wrapping around, a "back to the beginning" divider). */

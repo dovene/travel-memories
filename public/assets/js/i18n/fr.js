@@ -87,6 +87,18 @@ window.TM.locales.fr = {
   "viewer.counter": "{i} / {n}",
   "viewer.goto": "Aller à l'élément {n}",
 
+  "slideshow.play": "Lecture",
+  "slideshow.playLabel": "Lancer le diaporama de {name}",
+  "slideshow.label": "Diaporama",
+  "slideshow.close": "Fermer le diaporama",
+  "slideshow.pause": "Pause",
+  "slideshow.resume": "Reprendre",
+  "slideshow.mute": "Couper le son",
+  "slideshow.unmute": "Activer le son",
+  "slideshow.endTitle": "C'était {name}",
+  "slideshow.replay": "Revoir",
+  "slideshow.next": "Suivant : {name}",
+
   "card.soon": "Photos bientôt",
   "place.noMediaTitle": "Photos bientôt disponibles",
   "place.noMediaText": "Les photos et vidéos de ce voyage ne sont pas encore publiées.",

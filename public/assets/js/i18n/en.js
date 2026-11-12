@@ -87,6 +87,18 @@ window.TM.locales.en = {
   "viewer.counter": "{i} / {n}",
   "viewer.goto": "Go to item {n}",
 
+  "slideshow.play": "Play",
+  "slideshow.playLabel": "Play a slideshow of {name}",
+  "slideshow.label": "Slideshow",
+  "slideshow.close": "Close slideshow",
+  "slideshow.pause": "Pause",
+  "slideshow.resume": "Resume",
+  "slideshow.mute": "Mute",
+  "slideshow.unmute": "Turn sound on",
+  "slideshow.endTitle": "That was {name}",
+  "slideshow.replay": "Replay",
+  "slideshow.next": "Next: {name}",
+
   "card.soon": "Photos coming soon",
   "place.noMediaTitle": "Photos coming soon",
   "place.noMediaText": "The photographs and videos from this trip haven't been published yet.",
