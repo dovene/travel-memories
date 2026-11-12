@@ -333,7 +333,7 @@
         '<div class="container place-hero-content' + (n === 0 ? " hero-enter" : "") + '">' +
         '<a class="back-link" href="' + esc(homeHref()) + '">' + TM.icons.arrowLeft + esc(t(journey.filtered ? "journey.backFiltered" : "place.back")) + "</a>" +
         '<p class="eyebrow">' + esc(p.city) + " · " + esc(pick(p.country)) +
-        (p.featured ? '<span class="featured-tag">' + TM.icons.crown + esc(t("featured.badge")) + "</span>" : "") +
+        (p.featured ? '<span class="featured-tag" role="img" aria-label="' + esc(t("featured.badge")) + '" title="' + esc(t("featured.badge")) + '">' + TM.icons.crown + "</span>" : "") +
         '<span class="journey-pos">' + esc(position) + "</span></p>" +
         "<" + Heading + ' class="place-title">' + esc(pick(p.name)) + "</" + Heading + ">" +
         (p.media.length > 1
