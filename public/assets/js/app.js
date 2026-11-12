@@ -336,7 +336,7 @@
         (p.featured ? '<span class="featured-tag" role="img" aria-label="' + esc(t("featured.badge")) + '" title="' + esc(t("featured.badge")) + '">' + TM.icons.crown + "</span>" : "") +
         '<span class="journey-pos">' + esc(position) + "</span></p>" +
         "<" + Heading + ' class="place-title">' + esc(pick(p.name)) + "</" + Heading + ">" +
-        (p.media.length > 1
+        (p.media.length
           ? '<button type="button" class="hero-play" data-play aria-label="' + esc(t("slideshow.playLabel", { name: pick(p.name) })) + '">' +
             '<span class="hero-play-orb">' + TM.icons.play + '</span><span class="hero-play-text">' + esc(t("slideshow.play")) + "</span></button>"
           : "") +
@@ -403,23 +403,34 @@
      * "Next" scrolls the page to it (adding it if needed) and plays its slideshow.
      */
     function nextAfter(article) {
-      if (journey.list.length < 2) return null;
-      var p = journey.list[(journey.list.indexOf(journey.list.filter(function (x) {
-        return x.slug === article.getAttribute("data-slug");
-      })[0]) + 1) % journey.list.length];
+      var list = journey.list;
+      var from = list.map(function (x) {
+        return x.slug;
+      }).indexOf(article.getAttribute("data-slug"));
+      // The next destination that has something to play (destinations without media are skipped).
+      var target = null;
+      for (var k = 1; k < list.length && !target; k++) {
+        var cand = list[(from + k) % list.length];
+        if (cand.media.length) target = cand;
+      }
+      if (!target) return null;
       return {
-        place: p,
+        place: target,
         go: function () {
+          // Walk down the page from this section, adding sections as needed, to the target's section.
           var el = article.nextElementSibling;
-          while (el && !el.classList.contains("journey-item")) {
-            if (el === sentinel) {
-              appendNext();
-              el = article.nextElementSibling;
+          var guard = list.length + 2;
+          while (guard > 0) {
+            if (!el || el === sentinel) {
+              guard--;
+              if (!appendNext()) return;
+              el = sentinel.previousElementSibling;
               continue;
             }
+            if (el.classList.contains("journey-item") && el.getAttribute("data-slug") === target.slug) break;
             el = el.nextElementSibling;
           }
-          if (!el) return;
+          if (!el || guard <= 0) return;
           window.scrollTo({ top: el.getBoundingClientRect().top + window.pageYOffset, behavior: "instant" });
           var play = el.querySelector("[data-play]");
           if (play) play.click();
