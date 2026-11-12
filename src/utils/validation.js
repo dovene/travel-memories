@@ -62,7 +62,8 @@ const placeInputSchema = {
     city: placesSchema.$defs.place.properties.city,
     country: { $ref: "#/$defs/localizedName" },
     countryCode: placesSchema.$defs.place.properties.countryCode,
-    visitedAt: placesSchema.$defs.place.properties.visitedAt,
+    // Optional: "" means "no date" (clears it when editing).
+    visitedAt: { ...placesSchema.$defs.place.properties.visitedAt, pattern: "^(\\d{4}(-(0[1-9]|1[0-2]))?)?$" },
     slug: placesSchema.$defs.place.properties.slug,
     featured: placesSchema.$defs.place.properties.featured,
   },

@@ -276,6 +276,19 @@ describe("featured destinations and display order", () => {
     assert.deepEqual(await names("/api/admin/places"), expected, "the admin list uses the same order");
   });
 
+  test("the trip date is optional: empty on create, and can be cleared when editing", async () => {
+    const { call } = setup();
+    const created = await call("POST", "/api/admin/places", { owner: "dovene", body: { ...berlin, visitedAt: "" } });
+    assert.equal(created.status, 201);
+    assert.equal((await created.json()).visitedAt, undefined);
+    const place = await (await call("POST", "/api/admin/places", { owner: "dovene", body: { ...berlin, name: { en: "Dated" } } })).json();
+    const res = await call("PUT", `/api/admin/places/${place.id}`, { owner: "dovene", body: { visitedAt: "" }, headers: { "If-Match": '"1"' } });
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).visitedAt, undefined);
+    const bad = await call("PUT", `/api/admin/places/${place.id}`, { owner: "dovene", body: { visitedAt: "2026-13" }, headers: { "If-Match": '"2"' } });
+    assert.equal(bad.status, 422);
+  });
+
   test("the flag can be switched on and off, and only accepts true or false", async () => {
     const { bucket, call } = setup();
     const place = await (await call("POST", "/api/admin/places", { owner: "dovene", body: berlin })).json();
