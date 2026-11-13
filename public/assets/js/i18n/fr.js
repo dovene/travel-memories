@@ -105,7 +105,8 @@ window.TM.locales.fr = {
   "errors.loadTitle": "Impossible de charger le carnet",
   "errors.loadText": "Vérifiez votre connexion et réessayez.",
   "errors.retry": "Réessayer",
-  "footer.rights": "© {year} Travel Memories. Les photographies appartiennent à leurs auteurs.",
+  "footer.rights": "© {year} Travel Memories.",
+  "footer.rightsBy": "© {year} Travel Memories. Par {name}.",
   "footer.admin": "Administration",
   "footer.top": "Retour en haut"
 };

@@ -30,9 +30,28 @@
     onScroll();
   }
 
+  /* The author's name, from the journal's profile ("" when unknown); fetched once per page. */
+  var authorName = null;
+  function getAuthorName() {
+    if (!authorName)
+      authorName = TM.api
+        .getProfile()
+        .then(function (profile) {
+          return profile && typeof profile.displayName === "string" ? profile.displayName.trim() : "";
+        })
+        .catch(function () {
+          return "";
+        });
+    return authorName;
+  }
+
+  /* "© <year> Travel Memories. By <author>." (without the name when the profile is unavailable) */
+  var footerName = "";
   function initFooter() {
     var y = document.querySelector("[data-year]");
-    if (y) y.textContent = t("footer.rights", { year: new Date().getFullYear() });
+    if (!y) return;
+    var year = new Date().getFullYear();
+    y.textContent = footerName ? t("footer.rightsBy", { year: year, name: footerName }) : t("footer.rights", { year: year });
   }
 
   /* ---------- Home ---------- */
@@ -211,10 +230,8 @@
   function initAuthor() {
     var el = document.querySelector("[data-author]");
     if (!el) return;
-    TM.api
-      .getProfile()
-      .then(function (profile) {
-        var name = profile && typeof profile.displayName === "string" ? profile.displayName.trim() : "";
+    getAuthorName()
+      .then(function (name) {
         if (!name) return;
         el.removeAttribute("data-i18n"); // the translated line with the name replaces the plain one
         var render = function () {
@@ -664,6 +681,10 @@
     TM.i18n.onChange(initFooter);
     initHeader();
     initFooter();
+    getAuthorName().then(function (name) {
+      footerName = name;
+      initFooter();
+    });
     initQuote();
     // Static elements marked .reveal also fade in on scroll.
     TM.ui.reveal(document);

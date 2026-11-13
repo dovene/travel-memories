@@ -105,7 +105,8 @@ window.TM.locales.en = {
   "errors.loadTitle": "The journal could not be loaded",
   "errors.loadText": "Check your connection and try again.",
   "errors.retry": "Try again",
-  "footer.rights": "© {year} Travel Memories. All photographs belong to their authors.",
+  "footer.rights": "© {year} Travel Memories.",
+  "footer.rightsBy": "© {year} Travel Memories. By {name}.",
   "footer.admin": "Administration",
   "footer.top": "Back to top"
 };
