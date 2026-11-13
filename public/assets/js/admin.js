@@ -224,6 +224,53 @@
           })
           .join("")
       : '<li class="mm-empty" style="padding:var(--space-4)">No destinations yet. Create your first one.</li>';
+    applySearch();
+  }
+
+  /* Sidebar search: name (EN/FR), city or country, ignoring case and accents; every word must match. */
+  function applySearch() {
+    var query = $("dest-search").value;
+    var shown = {};
+    TM.filters.filterPlaces(places, { query: query }).forEach(function (p) {
+      shown[p.id] = true;
+    });
+    var count = 0;
+    $("dest-list").querySelectorAll(".dest-item").forEach(function (b) {
+      var hit = Boolean(shown[b.getAttribute("data-id")]);
+      b.parentNode.hidden = !hit;
+      if (hit) count++;
+    });
+    var searching = Boolean(TM.filters.normalize(query));
+    $("dest-total").textContent = places.length ? (searching ? count + " / " + places.length : String(places.length)) : "";
+    $("dest-none").hidden = !(searching && places.length && !count);
+  }
+
+  function initSearch() {
+    var input = $("dest-search");
+    input.addEventListener("input", applySearch);
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && input.value) {
+        input.value = "";
+        applySearch();
+        e.stopPropagation();
+      } else if (e.key === "Enter") {
+        // Enter opens the first match, like clicking it.
+        var first = $("dest-list").querySelector("li:not([hidden]) .dest-item");
+        if (first) first.click();
+        e.preventDefault();
+      }
+    });
+    // "/" jumps to the search box from anywhere outside a text field.
+    document.addEventListener("keydown", function (e) {
+      var t = e.target;
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      var side = $("admin-side");
+      if (side && !side.classList.contains("is-open") && getComputedStyle(side).position === "fixed") return;
+      e.preventDefault();
+      input.focus();
+      input.select();
+    });
   }
 
   /* ---------- editor ---------- */
@@ -1017,6 +1064,7 @@
       $("name").focus();
     });
 
+    initSearch();
     $("dest-list").addEventListener("click", function (e) {
       var b = e.target.closest(".dest-item");
       if (!b || !confirmLeave()) return;

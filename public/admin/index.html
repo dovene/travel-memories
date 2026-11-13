@@ -45,8 +45,13 @@
     <div class="admin-layout">
       <aside class="admin-side" id="admin-side" aria-label="Destinations">
         <button type="button" class="btn btn-primary btn-block" id="new-place"></button>
-        <h2>Destinations</h2>
+        <h2>Destinations <span class="dest-total" id="dest-total"></span></h2>
+        <div class="dest-search">
+          <label class="sr-only" for="dest-search">Search destinations</label>
+          <input class="input" id="dest-search" type="search" autocomplete="off" spellcheck="false" placeholder="Search name, city or country" />
+        </div>
         <ul class="dest-list" id="dest-list"></ul>
+        <p class="dest-none" id="dest-none" hidden>No destination matches.</p>
       </aside>
 
       <main class="admin-main" id="editor">
@@ -154,6 +159,7 @@
     <script src="../assets/js/i18n/en.js"></script>
     <script src="../assets/js/i18n.js"></script>
     <script src="../assets/js/gallery.js"></script>
+    <script src="../assets/js/filters.js"></script>
     <script src="../assets/js/admin-shell.js"></script>
     <script src="../assets/js/admin.js"></script>
   </body>

@@ -322,6 +322,24 @@ body.admin {
   padding-inline: var(--space-2);
 }
 
+.dest-total {
+  margin-left: var(--space-1);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--navy-40);
+}
+
+.dest-search .input {
+  min-height: 40px;
+  font-size: var(--fs-sm);
+}
+
+.dest-none {
+  padding: var(--space-2) var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
 .dest-list {
   list-style: none;
   margin: 0;
