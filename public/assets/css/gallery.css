@@ -144,16 +144,17 @@
   font-size: var(--fs-sm);
 }
 
+/* Masonry: columns are built by gallery.js (3 above 900px, 2 below). */
 .media-grid {
-  columns: 3;
-  column-gap: var(--space-4);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
   padding-bottom: var(--space-8);
 }
 
-@media (max-width: 900px) {
-  .media-grid {
-    columns: 2;
-  }
+.media-col {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .media-tile {
@@ -172,7 +173,14 @@
 }
 
 .media-tile .media {
+  position: relative;
   aspect-ratio: var(--ratio, 4 / 3);
+}
+
+/* Hover preview, laid over the poster image. */
+.media-tile .preview-video {
+  position: absolute;
+  inset: 0;
 }
 
 .media-tile img,
@@ -545,8 +553,7 @@ body.lb-locked {
   }
 
   .media-grid {
-    columns: 2;
-    column-gap: var(--space-2);
+    gap: var(--space-2);
   }
 
   .media-tile {

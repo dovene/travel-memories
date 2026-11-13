@@ -141,10 +141,17 @@
     var alt = pick(m.altText);
     if (m.type === "video") {
       var poster = TM.api.image(m);
+      /*
+       * The tile shows the poster as a plain image: Safari on iPhone does not draw <video>
+       * elements that sit in the second column of the gallery. The video itself is only
+       * created for the hover preview (see renderMediaGrid), or when there is no poster.
+       */
+      var visual = poster
+        ? imgTag(poster, "", { sizes: "(max-width: 640px) 50vw, (max-width: 1100px) 50vw, 33vw" })
+        : '<video muted loop playsinline preload="metadata" src="' + esc(m.url) + '#t=0.5"></video>';
       return (
-        '<button type="button" class="media-tile reveal" data-index="' + i + '" style="--ratio:' + ratio + '" aria-label="' + esc(t("media.play", { alt: alt })) + '">' +
-        '<div class="media shimmer"><video muted loop playsinline preload="' + (poster ? "none" : "metadata") + '"' +
-        (poster ? ' poster="' + esc(poster.src) + '"' : "") + ' src="' + esc(m.url) + (poster ? "" : "#t=0.5") + '"></video></div>' +
+        '<button type="button" class="media-tile reveal" data-index="' + i + '" data-video="' + esc(m.url) + '" style="--ratio:' + ratio + '" aria-label="' + esc(t("media.play", { alt: alt })) + '">' +
+        '<div class="media shimmer">' + visual + "</div>" +
         '<span class="play-orb">' + TM.icons.play + "</span>" +
         '<span class="media-badge">' + TM.icons.video + esc(t("media.video")) + "</span>" +
         "</button>"
@@ -157,42 +164,91 @@
     );
   }
 
+  /*
+   * Masonry columns built here rather than with CSS `columns`: Safari on iPhone fails to draw
+   * some tiles placed in the second CSS column. Each tile goes to the currently shortest
+   * column (heights are known from the media ratios), so the grid stays balanced.
+   */
+  var wideGrid = window.matchMedia ? window.matchMedia("(min-width: 901px)") : null;
+  function layoutColumns(container, tiles) {
+    var n = wideGrid && wideGrid.matches ? 3 : 2;
+    if (container.getAttribute("data-cols") === String(n)) return;
+    var cols = [];
+    var heights = [];
+    for (var k = 0; k < n; k++) {
+      var col = document.createElement("div");
+      col.className = "media-col";
+      cols.push(col);
+      heights.push(0);
+    }
+    tiles.forEach(function (tile) {
+      var r = String(tile.style.getPropertyValue("--ratio")).split("/");
+      var h = r.length === 2 && +r[0] ? +r[1] / +r[0] : 0.75;
+      var j = heights.indexOf(Math.min.apply(null, heights));
+      cols[j].appendChild(tile);
+      heights[j] += h;
+    });
+    container.innerHTML = "";
+    cols.forEach(function (c) {
+      container.appendChild(c);
+    });
+    container.setAttribute("data-cols", String(n));
+  }
+
   function renderMediaGrid(container, place, onOpen) {
     container.innerHTML = place.media
       .map(function (m, i) {
         return mediaTile(place, m, i);
       })
       .join("");
+    var tiles = Array.prototype.slice.call(container.children);
+    layoutColumns(container, tiles);
+    if (wideGrid && wideGrid.addEventListener)
+      wideGrid.addEventListener("change", function () {
+        if (container.isConnected) layoutColumns(container, tiles);
+      });
     wireLazy(container);
     reveal(container);
 
+    // Videos without a poster show their first frame instead.
     container.querySelectorAll("video").forEach(function (v) {
-      var holder = v.closest(".media");
-      if (v.poster) {
-        // The poster is a small image: show it as soon as it has loaded, without fetching the video.
-        var probe = new Image();
-        probe.onload = probe.onerror = function () {
-          holder.classList.remove("shimmer");
-        };
-        probe.src = v.poster;
-      } else {
-        v.addEventListener("loadeddata", function () {
-          holder.classList.remove("shimmer");
-        }, { once: true });
-      }
-      var tile = v.closest(".media-tile");
-      /* Silent preview on hover (pointer devices only). */
-      if (window.matchMedia("(hover: hover)").matches) {
+      v.addEventListener("loadeddata", function () {
+        v.closest(".media").classList.remove("shimmer");
+      }, { once: true });
+    });
+
+    /* Silent preview on hover (pointer devices only): the video is created on enter, removed on leave. */
+    if (window.matchMedia("(hover: hover)").matches) {
+      container.querySelectorAll(".media-tile[data-video]").forEach(function (tile) {
+        var media = tile.querySelector(".media");
+        var v = media.querySelector("video");
+        var own = !v; // created here for the preview (tiles with a poster image)
         tile.addEventListener("mouseenter", function () {
+          if (!v) {
+            v = document.createElement("video");
+            v.className = "preview-video";
+            v.muted = true;
+            v.loop = true;
+            v.playsInline = true;
+            v.src = tile.getAttribute("data-video");
+            media.appendChild(v);
+          }
           tile.classList.add("is-previewing");
           v.play().catch(function () {});
         });
         tile.addEventListener("mouseleave", function () {
           tile.classList.remove("is-previewing");
+          if (!v) return;
           v.pause();
+          if (own) {
+            v.removeAttribute("src");
+            v.load(); // stops the download
+            v.remove();
+            v = null;
+          }
         });
-      }
-    });
+      });
+    }
 
     container.addEventListener("click", function (e) {
       var tile = e.target.closest(".media-tile");
