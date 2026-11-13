@@ -118,16 +118,32 @@
       return;
     }
 
+    /* Only the first photo loads with the page; each next one loads just before its turn. */
     slidesEl.innerHTML = slides
       .map(function (s, i) {
-        return (
-          '<div class="hero-slide' + (i === 0 ? " is-active" : "") + '">' +
-          '<img alt="" ' + (i === 0 ? 'fetchpriority="high"' : 'loading="lazy"') + ' src="' + esc(s.image.src) + '"' +
-          (s.image.srcset ? ' srcset="' + esc(s.image.srcset) + '" sizes="100vw"' : "") + ">" +
-          "</div>"
-        );
+        return '<div class="hero-slide' + (i === 0 ? " is-active" : "") + '"><img alt=""' + (i === 0 ? ' fetchpriority="high"' : "") + "></div>";
       })
       .join("");
+
+    function load(i) {
+      var img = slidesEl.children[i] && slidesEl.children[i].querySelector("img");
+      if (!img || img.getAttribute("src")) return;
+      var s = slides[i].image;
+      if (s.srcset) {
+        img.setAttribute("srcset", s.srcset);
+        img.setAttribute("sizes", "100vw");
+      }
+      img.setAttribute("src", s.src);
+    }
+    load(0);
+    if (slides.length > 1) {
+      // The second photo loads once the page has settled, so it is ready for the first change.
+      if (document.readyState === "complete") load(1);
+      else
+        window.addEventListener("load", function () {
+          load(1);
+        });
+    }
 
     function renderDots() {
       dotsEl.innerHTML = slides
@@ -142,6 +158,8 @@
       var nodes = slidesEl.children;
       nodes[current].classList.remove("is-active");
       current = (i + slides.length) % slides.length;
+      load(current);
+      load((current + 1) % slides.length); // ready for the next change
       /* Restart Ken Burns on re-entry. */
       var img = nodes[current].querySelector("img");
       img.style.animation = "none";

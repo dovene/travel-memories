@@ -90,6 +90,32 @@ test("cover pictures fall back to a photo when the cover is a video without post
   assert.equal(api.image({ id: "o", type: "image", url: "/m/o", variants: {} }, "display").src, "/m/o", "no previews → original");
 });
 
+test("the hero shows every featured destination first, then 4 others from different countries", () => {
+  const ctx = { window: {}, document: { documentElement: { getAttribute: () => null } } };
+  vm.runInNewContext(readFileSync(new URL("../public/assets/js/api.js", import.meta.url), "utf8"), ctx);
+  const api = ctx.window.TM.api;
+  const photo = { id: "p", type: "image", url: "/m/p", variants: {} };
+  const place = (slug, countryCode, featured) => ({ slug, countryCode, featured, coverMediaId: "p", media: [photo] });
+  const list = [
+    place("f1", "MA", true), place("f2", "GB", true), place("f3", "TR", true), place("f4", "IT", true), place("f5", "FR", true),
+    place("london-1", "GB"), place("london-2", "GB"), place("london-3", "GB"), place("accra", "GH"), place("dakar", "SN"),
+    place("lisbon", "PT"), place("no-photo", "IS"),
+  ];
+  list[11].media = [];
+  list[11].coverMediaId = null;
+  const slugs = (r) => Array.from(api.heroSlides(list, r), (s) => s.place.slug);
+  for (const r of [() => 0, () => 0.5, () => 0.999, Math.random]) {
+    const got = slugs(r);
+    assert.deepEqual(got.slice(0, 5), ["f1", "f2", "f3", "f4", "f5"], "featured first, in order");
+    assert.equal(got.length, 9);
+    const extra = got.slice(5);
+    assert.equal(extra.filter((s) => s.startsWith("london")).length <= 1, true, "at most one pick per country");
+    assert.ok(!extra.includes("no-photo"));
+  }
+  const many = Array.from({ length: 12 }, (_, i) => place("f" + i, "C" + i, true));
+  assert.equal(api.heroSlides(many).length, 9, "never more than 9 slides");
+});
+
 test("the journey follows the list the visitor came from", () => {
   const slugs = (r) => Array.from(r.list, (p) => p.slug);
   const all = TM.filters.journey(places, "kyoto", {});
