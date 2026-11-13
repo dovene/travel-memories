@@ -219,6 +219,11 @@ p {
   margin-bottom: var(--space-6);
 }
 
+/* Right below the hero: a short gap, so the heading shows on the first screen. */
+#destinations.section {
+  padding-top: var(--space-6);
+}
+
 .section-title {
   font-size: var(--fs-2xl);
   margin-top: var(--space-3);

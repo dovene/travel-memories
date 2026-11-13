@@ -185,6 +185,7 @@
       });
       pagerDot.style.left = ((current + 0.5) / slides.length) * 100 + "%"; // middle of its slice of the line
       labelEl.textContent = pick(slides[current].place.name);
+      labelEl.setAttribute("href", TM.ui.placeHref(slides[current].place));
     }
 
     function show(i) {
@@ -221,6 +222,31 @@
       if (document.hidden) clearInterval(timer);
       else start();
     });
+
+    /* A click or tap on the hero photo opens the destination it shows (links and buttons keep their own job). */
+    hero.classList.add("is-linked");
+    hero.addEventListener("click", function (e) {
+      if (e.defaultPrevented || e.target.closest("a, button, input")) return;
+      if (window.getSelection && String(window.getSelection())) return; // selecting text, not opening
+      location.href = TM.ui.placeHref(slides[current].place);
+    });
+
+    /* Swipe left / right on touch screens to change the destination. */
+    var touch = null;
+    hero.addEventListener("touchstart", function (e) {
+      touch = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+    }, { passive: true });
+    hero.addEventListener("touchend", function (e) {
+      if (!touch || slides.length < 2) return;
+      var dx = e.changedTouches[0].clientX - touch.x;
+      var dy = e.changedTouches[0].clientY - touch.y;
+      touch = null;
+      if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return; // a tap or a vertical scroll
+      if (e.cancelable) e.preventDefault(); // no click (and no page opening) after a swipe
+      show(current + (dx < 0 ? 1 : -1));
+      start();
+    });
+
     TM.i18n.onChange(renderDots);
     renderDots();
     start();

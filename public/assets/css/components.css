@@ -3,9 +3,13 @@
    ========================================================================== */
 
 /* ---------- Hero ---------- */
+/*
+ * The hero stops a little before the bottom of the screen, so the "Destinations" heading
+ * already shows below it and invites visitors to scroll.
+ */
 .hero {
   position: relative;
-  min-height: 100svh;
+  min-height: calc(100svh - 10.5rem);
   display: grid;
   align-items: end;
   color: var(--white);
@@ -62,7 +66,7 @@
 }
 
 .hero-content {
-  padding-block: calc(var(--header-h) + var(--space-8)) var(--space-8);
+  padding-block: calc(var(--header-h) + var(--space-8)) var(--space-6);
   display: grid;
   gap: var(--space-6);
 }
@@ -148,6 +152,25 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
+}
+
+/* The whole photo opens the destination shown (see initHero). */
+.hero.is-linked {
+  cursor: pointer;
+}
+
+.hero-place {
+  color: var(--white);
+  font-weight: 700;
+}
+
+.hero-place::after {
+  content: " ›";
+}
+
+.hero-place:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 /* Pager: one line for all the destinations, one dot for the current one. */
@@ -639,9 +662,40 @@
     gap: var(--space-5);
   }
 
-  .hero-caption,
   .scroll-cue {
     display: none;
+  }
+
+  /* Phones: a shorter hero, so the "Destinations" heading clears Safari's bottom bar. */
+  .hero {
+    min-height: calc(100svh - 14rem);
+  }
+
+  .hero-content {
+    padding-top: calc(var(--header-h) + var(--space-7));
+  }
+
+  /* Phones: the destination's name (a link) and the pager sit at the top of the photo. */
+  .hero-caption {
+    left: var(--gutter);
+    right: var(--gutter);
+    top: calc(var(--header-h) + var(--space-4));
+    justify-content: space-between;
+  }
+
+  .hero-now {
+    display: none;
+  }
+
+  .hero-now-wrap {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .hero-dots {
+    flex: none;
   }
 
   .place-grid {
