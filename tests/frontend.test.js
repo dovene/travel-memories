@@ -62,6 +62,18 @@ test("mock content respects storage invariants", () => {
   }
 });
 
+test("the browser language picks French for French, English for everything else", () => {
+  const pickLang = (l) => TM.i18n.browserLang(l);
+  assert.equal(pickLang(["fr-FR", "en"]), "fr");
+  assert.equal(pickLang(["fr"]), "fr");
+  assert.equal(pickLang(["FR-ca"]), "fr");
+  assert.equal(pickLang(["en-US", "fr"]), "en", "the first preference decides");
+  assert.equal(pickLang(["de-DE"]), "en");
+  assert.equal(pickLang(["fy"]), "en", "not mistaken for French");
+  assert.equal(pickLang([]), "en");
+  assert.equal(pickLang(undefined), "en");
+});
+
 test("there are at least 20 quotes, each with an emphasised word in both languages", () => {
   const keys = Array.from(TM.quotes.keys());
   assert.ok(keys.length >= 20, `only ${keys.length} quotes`);

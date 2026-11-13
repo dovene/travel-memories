@@ -16,10 +16,21 @@
     }
   }
 
+  /*
+   * Language of the visitor's browser: French when their preferred language is French
+   * (fr, fr-FR, fr-CA…), English for English and every other language.
+   */
+  function browserLang(languages) {
+    var first = (languages && languages[0]) || "";
+    return /^fr\b/i.test(first) ? "fr" : DEFAULT;
+  }
+
+  /* A language picked with the EN/FR switch wins; otherwise the browser's language. */
   function detect() {
     var stored = readStored();
     if (stored && SUPPORTED.indexOf(stored) !== -1) return stored;
-    return DEFAULT;
+    var nav = window.navigator || {};
+    return browserLang(nav.languages && nav.languages.length ? nav.languages : [nav.language]);
   }
 
   var current = detect();
@@ -91,6 +102,7 @@
     apply: apply,
     setLang: setLang,
     formatMonth: formatMonth,
+    browserLang: browserLang,
     get lang() {
       return current;
     },
