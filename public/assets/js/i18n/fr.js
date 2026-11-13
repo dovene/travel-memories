@@ -8,7 +8,6 @@ window.TM.locales.fr = {
 
   "hero.eyebrow": "Un carnet de voyage personnel",
   "hero.title": "Lieux, instants <em>&amp; souvenirs.</em>",
-  "hero.text": "Une lente collection des villes, des côtes et des montagnes que j'ai eu la chance de parcourir — racontée surtout en images.",
   "hero.cta": "Explorer les destinations",
   "hero.stat.places": "Destinations",
   "hero.stat.countries": "Pays",

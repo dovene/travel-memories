@@ -8,7 +8,6 @@ window.TM.locales.en = {
 
   "hero.eyebrow": "A personal travel journal",
   "hero.title": "Places, moments <em>&amp; memories.</em>",
-  "hero.text": "A slow collection of the cities, coastlines and mountains I have been lucky enough to wander through — told mostly in pictures.",
   "hero.cta": "Explore destinations",
   "hero.stat.places": "Destinations",
   "hero.stat.countries": "Countries",

@@ -448,19 +448,7 @@ p {
 .site-footer {
   background: var(--navy);
   color: rgba(255, 255, 255, 0.82);
-  padding-block: var(--space-8) var(--space-6);
-}
-
-.footer-quote {
-  font-family: var(--font-display);
-  font-size: var(--fs-xl);
-  color: var(--white);
-  max-width: 22ch;
-  line-height: 1.15;
-}
-
-.footer-quote em {
-  color: #8fd3f2;
+  padding-block: var(--space-6);
 }
 
 .footer-bottom {
@@ -468,9 +456,6 @@ p {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: var(--space-4);
-  margin-top: var(--space-8);
-  padding-top: var(--space-5);
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
   font-size: var(--fs-sm);
   color: rgba(255, 255, 255, 0.55);
 }

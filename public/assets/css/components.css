@@ -89,6 +89,12 @@
   color: rgba(255, 255, 255, 0.86);
 }
 
+/* The hero line is a travel quote, different on each visit; its key word echoes the title. */
+.hero-text em {
+  font-style: italic;
+  color: var(--sky);
+}
+
 .hero-row {
   display: flex;
   flex-wrap: wrap;

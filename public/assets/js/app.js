@@ -38,7 +38,7 @@
   /* ---------- Home ---------- */
 
   /*
-   * Footer quote: one of the "quote.N" translations, chosen at random on each page view.
+   * Hero quote (under the title): one of the "quote.N" translations, chosen at random on each page view.
    * The previous quote is skipped so the same phrase never appears twice in a row,
    * and the same quote stays in place when the language changes.
    */
