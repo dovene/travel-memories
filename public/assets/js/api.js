@@ -97,12 +97,12 @@
 
   /* Up to four destinations with a picture cover, for the homepage hero. */
   /*
-   * Destinations shown in the home hero: every featured one first (in list order), then
-   * HERO_EXTRA others picked at random on each visit, at most one per country, for at most
-   * HERO_MAX slides. Only destinations whose cover can be shown as a photo take part.
+   * Destinations shown in the home hero, HERO_MAX slides when there are enough: every featured
+   * one first (in list order), then others picked at random on each visit to fill the rest,
+   * one per country first and a second one from a country only when countries run out.
+   * Only destinations whose cover can be shown as a photo take part.
    */
   var HERO_MAX = 9;
-  var HERO_EXTRA = 4;
 
   function heroSlides(places, random) {
     random = random || Math.random;
@@ -122,14 +122,16 @@
       others[j] = tmp;
     }
     var countries = {};
-    var room = Math.min(HERO_EXTRA, HERO_MAX - picked.length);
-    for (var k = 0; k < others.length && room > 0; k++) {
+    var later = []; // same country as an earlier pick: used only if slots remain
+    for (var k = 0; k < others.length && picked.length < HERO_MAX; k++) {
       var c = others[k].countryCode || others[k].slug;
-      if (countries[c]) continue;
-      countries[c] = true;
-      picked.push(others[k]);
-      room--;
+      if (countries[c]) later.push(others[k]);
+      else {
+        countries[c] = true;
+        picked.push(others[k]);
+      }
     }
+    for (var m = 0; m < later.length && picked.length < HERO_MAX; m++) picked.push(later[m]);
     return picked.map(function (p) {
       return { place: p, image: coverImage(p, "display") };
     });

@@ -145,12 +145,26 @@
         });
     }
 
-    function renderDots() {
-      dotsEl.innerHTML = slides
-        .map(function (_, i) {
-          return '<button type="button" aria-label="' + esc(t("hero.slide", { n: i + 1 })) + '" aria-current="' + (i === current) + '"></button>';
+    /*
+     * Pager: a thin line standing for all the slides, with one dot that slides along it to the
+     * current one. Each slide still has its own (invisible) button on the line, for clicks,
+     * keyboard and screen readers.
+     */
+    dotsEl.innerHTML =
+      '<span class="hero-pager-line" aria-hidden="true"></span><span class="hero-pager-dot" aria-hidden="true"></span>' +
+      slides
+        .map(function () {
+          return '<button type="button"></button>';
         })
         .join("");
+    var pagerDot = dotsEl.querySelector(".hero-pager-dot");
+
+    function renderDots() {
+      Array.prototype.forEach.call(dotsEl.querySelectorAll("button"), function (b, i) {
+        b.setAttribute("aria-label", t("hero.slide", { n: i + 1 }));
+        b.setAttribute("aria-current", String(i === current));
+      });
+      pagerDot.style.left = ((current + 0.5) / slides.length) * 100 + "%"; // middle of its slice of the line
       labelEl.textContent = pick(slides[current].place.name);
     }
 
@@ -181,7 +195,7 @@
     dotsEl.addEventListener("click", function (e) {
       var b = e.target.closest("button");
       if (!b) return;
-      show(Array.prototype.indexOf.call(dotsEl.children, b));
+      show(Array.prototype.indexOf.call(dotsEl.querySelectorAll("button"), b));
       start();
     });
     document.addEventListener("visibilitychange", function () {

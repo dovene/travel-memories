@@ -90,7 +90,7 @@ test("cover pictures fall back to a photo when the cover is a video without post
   assert.equal(api.image({ id: "o", type: "image", url: "/m/o", variants: {} }, "display").src, "/m/o", "no previews → original");
 });
 
-test("the hero shows every featured destination first, then 4 others from different countries", () => {
+test("the hero shows every featured destination first, then fills up to 9 with others", () => {
   const ctx = { window: {}, document: { documentElement: { getAttribute: () => null } } };
   vm.runInNewContext(readFileSync(new URL("../public/assets/js/api.js", import.meta.url), "utf8"), ctx);
   const api = ctx.window.TM.api;
@@ -114,6 +114,17 @@ test("the hero shows every featured destination first, then 4 others from differ
   }
   const many = Array.from({ length: 12 }, (_, i) => place("f" + i, "C" + i, true));
   assert.equal(api.heroSlides(many).length, 9, "never more than 9 slides");
+
+  // No featured destination: 9 others, one per country while countries last.
+  const plain = Array.from({ length: 14 }, (_, i) => place("p" + i, "K" + (i % 10)));
+  for (const r of [() => 0, () => 0.5, () => 0.999, Math.random]) {
+    const got = Array.from(api.heroSlides(plain, r), (s) => s.place.countryCode);
+    assert.equal(got.length, 9);
+    assert.equal(new Set(got).size, 9, "9 different countries when there are enough");
+  }
+  // Fewer countries than slots: a country may then appear twice.
+  const twoCountries = Array.from({ length: 6 }, (_, i) => place("q" + i, i % 2 ? "AA" : "BB"));
+  assert.equal(api.heroSlides(twoCountries).length, 6, "every destination with a photo when fewer than 9");
 });
 
 test("the journey follows the list the visitor came from", () => {

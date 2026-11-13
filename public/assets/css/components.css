@@ -150,33 +150,51 @@
   gap: var(--space-3);
 }
 
+/* Pager: one line for all the destinations, one dot for the current one. */
 .hero-dots {
+  position: relative;
   display: flex;
-  gap: 6px;
+  width: 96px;
+  height: 22px;
 }
 
+.hero-pager-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.hero-pager-dot {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--white);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+  translate: -50% -50%;
+  transition: left 0.6s var(--ease);
+  pointer-events: none;
+}
+
+/* One invisible button per destination, sharing the line's length (bigger hit area). */
 .hero-dots button {
-  width: 22px;
-  height: 22px;
+  position: relative;
+  flex: 1;
+  height: 100%;
   padding: 0;
   border: 0;
   background: transparent;
-  display: grid;
-  place-items: center;
+  cursor: pointer;
 }
 
-.hero-dots button::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.45);
-  transition: background var(--dur) var(--ease), transform var(--dur) var(--ease);
-}
-
-.hero-dots button[aria-current="true"]::before {
-  background: var(--white);
-  transform: scale(1.4);
+.hero-dots button:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .scroll-cue {
