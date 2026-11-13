@@ -1,6 +1,8 @@
 /*
  * Slideshow ("Play" on a destination's cover): every photo and video of the destination,
  * one after another, full screen, like stories.
+ *  - It opens on a title card, like the opening of a film: the cover photo slowly pushing in
+ *    between cinema bars, the destination's place, name, date and story revealed one by one.
  *  - Photos stay about 5 seconds, videos play to the end. It starts muted; turning sound on
  *    is remembered for the next slideshows.
  *  - Progress bars on top; tap the right side for next, left side for previous;
@@ -19,6 +21,7 @@
   };
 
   var PHOTO_MS = 5000;
+  var INTRO_MS = 6500; // the title card; a little longer when there is a story to read
   var HOLD_MS = 220;
   var UP_NEXT_MS = 8000; // countdown on the end screen before the next destination plays
 
@@ -127,7 +130,7 @@
     if (next) nextBtn.querySelector(".ss-next-label").textContent = t("slideshow.next", { name: TM.i18n.pick(next.place.name) });
     stayBtn.textContent = t("slideshow.stay");
     renderUpNext();
-    if (items[index]) counterEl.textContent = t("viewer.counter", { i: index + 1, n: items.length });
+    counterEl.textContent = index > 0 ? t("viewer.counter", { i: index, n: items.length - 1 }) : ""; // the title card is not counted
   }
 
   function soundPreference() {
@@ -147,7 +150,9 @@
     var el = document.createElement("div");
     el.className = "ss-slide";
     var s = { el: el, type: m.type, loaded: false };
-    if (m.type === "video") {
+    if (m.type === "intro") {
+      buildIntro(s);
+    } else if (m.type === "video") {
       var v = document.createElement("video");
       v.playsInline = true;
       v.preload = "auto";
@@ -189,6 +194,59 @@
     slides[i] = s;
     stage.appendChild(el);
     return s;
+  }
+
+  /*
+   * The title card. Layers, back to front: the cover photo (pushing in with a slight 3D tilt),
+   * a light sweep, vignette and cinema bars; then the text: "City · Country", the name word by
+   * word, a drawn line, the visit date and the start of the story.
+   */
+  function buildIntro(s) {
+    var pick = TM.i18n.pick;
+    var el = s.el;
+    el.classList.add("ss-intro");
+    var pic = TM.api.coverImage(place, "display");
+    var where = [place.city, pick(place.country)].filter(Boolean).join(" · ");
+    var when = place.visitedAt ? TM.i18n.formatMonth(place.visitedAt) : "";
+    var story = (pick(place.description) || "").trim();
+    var words = (pick(place.name) || "").split(/\s+/).filter(Boolean);
+    var esc = TM.ui.esc;
+    el.innerHTML =
+      '<div class="ss-intro-scene" aria-hidden="true">' +
+      (pic ? '<img class="ss-intro-photo" alt="" decoding="async" draggable="false">' : "") +
+      '<span class="ss-intro-sweep"></span><span class="ss-intro-shade"></span>' +
+      "</div>" +
+      '<span class="ss-intro-bar is-top" aria-hidden="true"></span><span class="ss-intro-bar is-bottom" aria-hidden="true"></span>' +
+      '<div class="ss-intro-text">' +
+      (where ? '<p class="ss-intro-where">' + esc(where) + "</p>" : "") +
+      '<h2 class="ss-intro-name">' +
+      words
+        .map(function (w, k) {
+          return '<span class="ss-word"><span style="--w:' + k + '">' + esc(w) + "</span></span>";
+        })
+        .join(" ") +
+      "</h2>" +
+      '<span class="ss-intro-rule" aria-hidden="true"></span>' +
+      (when ? '<p class="ss-intro-when">' + esc(when) + "</p>" : "") +
+      (story ? '<p class="ss-intro-story">' + esc(story) + "</p>" : "") +
+      "</div>";
+    el.style.setProperty("--words", String(words.length));
+    s.duration = INTRO_MS + Math.min(3500, story.length * 25);
+    el.style.setProperty("--intro", s.duration + "ms");
+    var img = el.querySelector(".ss-intro-photo");
+    if (!img) {
+      s.loaded = true;
+      return;
+    }
+    img.onload = img.onerror = function () {
+      s.loaded = true;
+      el.classList.add("is-ready");
+    };
+    if (pic.srcset) {
+      img.sizes = "100vw";
+      img.srcset = pic.srcset;
+    }
+    img.src = pic.src;
   }
 
   /* Keep only the current item and its neighbours in the page (videos are heavy). */
@@ -241,6 +299,13 @@
       if (x) x.el.classList.toggle("is-active", k === i);
     });
     for (var k = 0; k < items.length; k++) fill(k, k < i ? 1 : 0);
+    root.classList.toggle("is-intro", s.type === "intro");
+    if (s.type === "intro") {
+      // Replay the opening from the start each time the card is shown.
+      s.el.classList.remove("is-playing");
+      void s.el.offsetWidth;
+      s.el.classList.add("is-playing");
+    }
     labels();
     if (s.video) {
       try {
@@ -351,8 +416,9 @@
       return;
     }
     if (s.loaded && !paused && !held) elapsed += dt;
-    fill(index, elapsed / PHOTO_MS);
-    if (elapsed >= PHOTO_MS) show(index + 1);
+    var duration = s.duration || PHOTO_MS;
+    fill(index, elapsed / duration);
+    if (elapsed >= duration) show(index + 1);
   }
 
   /* ---------- input ---------- */
@@ -454,7 +520,7 @@
     });
     place = p;
     next = options.next || null;
-    items = p.media.slice();
+    items = [{ type: "intro" }].concat(p.media);
     slides = [];
     index = 0;
     opener = options.from || document.activeElement;
