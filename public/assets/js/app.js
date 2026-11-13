@@ -38,8 +38,9 @@
   /* ---------- Home ---------- */
 
   /*
-   * Hero quote (under the title): one of the "quote.N" translations, chosen at random on each page view.
-   * The previous quote is skipped so the same phrase never appears twice in a row,
+   * Hero quote (under the title): one of the "quote.N" translations, chosen at random.
+   * A new one comes with each destination shown in the hero (see initHero). The previous
+   * quote is skipped so the same phrase never appears twice in a row (also across visits),
    * and the same quote stays in place when the language changes.
    */
   function quoteKeys() {
@@ -55,22 +56,38 @@
     return pool[Math.floor((random || Math.random)() * pool.length)];
   }
 
+  var quote = { next: function () {} };
+
   function initQuote() {
     var el = document.querySelector("[data-quote]");
     if (!el) return;
-    var last = null;
+    var key = null;
+    var fadeTimer = null;
     try {
-      last = localStorage.getItem("tm.lastQuote");
+      key = localStorage.getItem("tm.lastQuote");
     } catch (e) {}
-    var key = pickQuote(quoteKeys(), last);
-    try {
-      localStorage.setItem("tm.lastQuote", key);
-    } catch (e) {}
-    function render() {
-      el.innerHTML = t(key);
+    function choose() {
+      key = pickQuote(quoteKeys(), key);
+      try {
+        localStorage.setItem("tm.lastQuote", key);
+      } catch (e) {}
     }
+    function render() {
+      el.innerHTML = '<span class="quote-line">' + t(key) + "</span>";
+    }
+    choose();
     render();
     TM.i18n.onChange(render);
+    /* Fades the current quote out, swaps it, fades the new one in. */
+    quote.next = function () {
+      choose();
+      clearTimeout(fadeTimer);
+      el.classList.add("is-changing");
+      fadeTimer = setTimeout(function () {
+        render();
+        el.classList.remove("is-changing");
+      }, 400);
+    };
   }
 
   TM.quotes = { keys: quoteKeys, pick: pickQuote };
@@ -132,6 +149,7 @@
       img.style.animation = "";
       nodes[current].classList.add("is-active");
       renderDots();
+      quote.next(); // each destination in the hero comes with a new quote
     }
 
     function start() {

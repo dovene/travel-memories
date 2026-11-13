@@ -89,7 +89,15 @@
   color: rgba(255, 255, 255, 0.86);
 }
 
-/* The hero line is a travel quote, different on each visit; its key word echoes the title. */
+/* The hero line is a travel quote that changes with each destination in the hero; its key word echoes the title. */
+.hero-text .quote-line {
+  transition: opacity 0.4s var(--ease);
+}
+
+.hero-text.is-changing .quote-line {
+  opacity: 0;
+}
+
 .hero-text em {
   font-style: italic;
   color: var(--sky);
