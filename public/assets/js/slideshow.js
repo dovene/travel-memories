@@ -33,6 +33,7 @@
   var slides = []; // index → { el, type, img|video, loaded }
   var index = 0;
   var opener = null;
+  var onClose = null; // called when the slideshow closes (the home hero resumes its rotation)
   var paused = false;
   var held = false;
   var ended = false;
@@ -510,7 +511,7 @@
 
   /* ---------- open / close ---------- */
 
-  /* options: { from: element to refocus on close, next: { place, go } } */
+  /* options: { from: element to refocus on close, next: { place, go }, onClose: function } */
   function open(p, options) {
     if (!p || !p.media.length) return;
     if (!root) build();
@@ -520,6 +521,7 @@
     });
     place = p;
     next = options.next || null;
+    onClose = options.onClose || null;
     items = [{ type: "intro" }].concat(p.media);
     slides = [];
     index = 0;
@@ -551,6 +553,9 @@
     endPanel.hidden = true;
     document.body.classList.remove("lb-locked");
     if (opener && opener.focus) opener.focus({ preventScroll: true });
+    var done = onClose;
+    onClose = null;
+    if (done) done();
   }
 
   TM.slideshow = { open: open, close: close };

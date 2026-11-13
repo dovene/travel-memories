@@ -186,6 +186,7 @@
       pagerDot.style.left = ((current + 0.5) / slides.length) * 100 + "%"; // middle of its slice of the line
       labelEl.textContent = pick(slides[current].place.name);
       labelEl.setAttribute("href", TM.ui.placeHref(slides[current].place));
+      if (playBtn && !playBtn.hidden) labelPlay();
     }
 
     function show(i) {
@@ -246,6 +247,39 @@
       show(current + (dx < 0 ? 1 : -1));
       start();
     });
+
+    /*
+     * Play: the slideshow of the destination shown, straight from the first screen. When it
+     * ends, the next destination of the hero follows (with the slideshow's countdown), and the
+     * hero moves along with it; the hero's own rotation waits while the slideshow is open.
+     */
+    var playBtn = document.querySelector("[data-hero-play]");
+    function heroNext(k) {
+      if (slides.length < 2) return null;
+      var n = (k + 1) % slides.length;
+      return {
+        place: slides[n].place,
+        go: function () {
+          show(n);
+          playFrom(n);
+        }
+      };
+    }
+    function playFrom(k) {
+      clearInterval(timer);
+      TM.slideshow.open(slides[k].place, { from: playBtn, next: heroNext(k), onClose: start });
+    }
+    function labelPlay() {
+      playBtn.setAttribute("aria-label", t("slideshow.playLabel", { name: pick(slides[current].place.name) }));
+    }
+    if (playBtn && TM.slideshow) {
+      playBtn.querySelector("[data-icon]").innerHTML = TM.icons.play;
+      playBtn.hidden = false;
+      playBtn.addEventListener("click", function () {
+        playFrom(current);
+      });
+      TM.i18n.onChange(labelPlay);
+    }
 
     TM.i18n.onChange(renderDots);
     renderDots();

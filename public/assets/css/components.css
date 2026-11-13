@@ -118,7 +118,29 @@
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-3);
+}
+
+/* Home hero: the Play button sits next to "Explore destinations" (styles shared with the destination page). */
+.hero-actions .hero-play {
+  position: static;
+}
+
+/* Same height as the button next to it, so the hero does not grow. */
+.hero-actions .hero-play-orb {
+  width: 48px;
+  height: 48px;
+}
+
+.hero-actions .hero-play {
+  padding: 0 var(--space-5) 0 0;
+}
+
+@media (max-width: 640px) {
+  .hero-actions .hero-play {
+    padding: 0;
+  }
 }
 
 .hero-stats {
@@ -673,6 +695,11 @@
 
   .hero-content {
     padding-top: calc(var(--header-h) + var(--space-7));
+    padding-bottom: var(--space-5);
+  }
+
+  #destinations.section {
+    padding-top: var(--space-5);
   }
 
   /* Phones: the destination's name (a link) and the pager sit at the top of the photo. */
