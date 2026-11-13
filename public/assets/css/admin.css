@@ -1359,3 +1359,20 @@ dialog.confirm .buttons {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- Profile ---------- */
+.profile-panel form {
+  display: grid;
+  gap: var(--space-4);
+  max-width: 520px;
+}
+
+.profile-preview {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.profile-preview span {
+  color: var(--navy);
+  font-weight: 600;
+}

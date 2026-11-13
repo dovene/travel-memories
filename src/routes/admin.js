@@ -99,6 +99,31 @@ function logout(request) {
   return new Response(null, { status: 204, headers: { "Set-Cookie": clearedSessionCookie(), ...SECURITY_HEADERS } });
 }
 
+/*
+ * The signed-in author's profile. Only the display name can be edited here: it is shown on the
+ * home page as "A personal travel journal by <name>".
+ */
+async function readOwnProfile(env, session) {
+  const entry = await new ContentStore(env.STORAGE).getProfile(session.ownerId);
+  return { displayName: entry ? entry.data.displayName : "" };
+}
+
+async function updateOwnProfile(env, session, body) {
+  const name = body && typeof body.displayName === "string" ? body.displayName.replace(/\s+/g, " ").trim() : "";
+  if (!name || name.length > 80)
+    throw new ApiError(422, "invalid_content", "Enter a name of 1 to 80 characters.", [{ path: "/displayName", message: "must be 1 to 80 characters" }]);
+  const store = new ContentStore(env.STORAGE);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const entry = await store.getProfile(session.ownerId);
+    const now = new Date().toISOString();
+    const profile = entry
+      ? { ...entry.data, displayName: name, updatedAt: now }
+      : { schemaVersion: 1, ownerId: session.ownerId, username: session.username, displayName: name, createdAt: now, updatedAt: now };
+    if (await store.saveProfile(profile, entry && entry.etag)) return { displayName: name };
+  }
+  throw new ApiError(409, "conflict", "The profile changed at the same time. Try again.");
+}
+
 export async function handleAdmin(request, env, segments, { getSession }) {
   const [resource, id, sub, subId, extra, variantName, beyond] = segments;
 
@@ -119,6 +144,12 @@ export async function handleAdmin(request, env, segments, { getSession }) {
     if (request.method !== "GET") return methodNotAllowed(["GET"]);
     const q = new URL(request.url).searchParams;
     return json({ from: q.get("from"), to: q.get("to"), visits: await readVisits(env.STORAGE, session.ownerId, q.get("from"), q.get("to")) });
+  }
+
+  if (resource === "profile" && id === undefined) {
+    if (request.method === "GET") return json(await readOwnProfile(env, session));
+    if (request.method !== "PUT") return methodNotAllowed(["GET", "PUT"]);
+    return json(await updateOwnProfile(env, session, await readJsonBody(request)));
   }
 
   if (resource === "backup" && sub === undefined) {

@@ -146,6 +146,7 @@ JSON responses carry an `ETag` and answer `304` when unchanged.
 | `PUT /api/admin/places/:id/media/order` | `{ order: [ids] }`. It must list exactly the current media, otherwise `409` with `currentOrder` |
 | `PUT /api/admin/places/:id/media/cover` | `{ mediaId }` |
 | `PUT /api/admin/places/:id/media/:mediaId/variants/:name` | A preview (`thumb`, `display` or `poster`): raw JPEG/WEBP/PNG body with `X-Media-Width` and `X-Media-Height` |
+| `GET` / `PUT /api/admin/profile` | The author's name (`{ displayName }`, 1–80 characters), shown on the home page as "A personal travel journal by …" |
 | `GET /api/admin/visits?from=yyyy-mm-dd&to=yyyy-mm-dd` | Raw visits of at most 31 days per call |
 | `GET /api/admin/backup/content` | The username, profile and places documents, byte for byte |
 | `POST /api/admin/backup/existing` | `{ paths }` → `{ existing: { path: size } }` for media already stored |

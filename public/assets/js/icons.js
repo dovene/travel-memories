@@ -21,6 +21,7 @@
     download: "<svg " + a + '><path d="M12 4v12M7 11l5 5 5-5M4 20h16"/></svg>',
     camera: "<svg " + a + '><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
     video: "<svg " + a + '><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg>',
+    user: "<svg " + a + '><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
     pin: "<svg " + a + '><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
     compass: "<svg " + a + '><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg>',
     check: "<svg " + a + '><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',

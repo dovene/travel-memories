@@ -157,7 +157,29 @@
     start();
   }
 
+  /* "A personal travel journal by <name>": the author's name comes from the journal's profile. */
+  function initAuthor() {
+    var el = document.querySelector("[data-author]");
+    if (!el) return;
+    TM.api
+      .getProfile()
+      .then(function (profile) {
+        var name = profile && typeof profile.displayName === "string" ? profile.displayName.trim() : "";
+        if (!name) return;
+        el.removeAttribute("data-i18n"); // the translated line with the name replaces the plain one
+        var render = function () {
+          el.textContent = t("hero.eyebrowBy", { name: name });
+        };
+        render();
+        TM.i18n.onChange(render);
+      })
+      .catch(function () {
+        /* the plain line stays */
+      });
+  }
+
   function initHome() {
+    initAuthor();
     var grid = document.getElementById("place-grid");
     var chipsEl = document.getElementById("country-chips");
     var input = document.getElementById("search");

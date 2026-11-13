@@ -177,3 +177,26 @@ describe("backup and restore", () => {
     assert.equal(res.status, 403);
   });
 });
+
+describe("author profile", () => {
+  test("the owner reads and renames their profile; the public profile shows the new name", async () => {
+    const { bucket, call } = setup();
+    assert.deepEqual(await (await call("GET", "/api/admin/profile", { owner: "dovene" })).json(), { displayName: "dovene" });
+    const res = await call("PUT", "/api/admin/profile", { owner: "dovene", body: { displayName: "  Dov  " } });
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { displayName: "Dov" });
+    const stored = bucket.json(keys.profile("dovene"));
+    assert.equal(stored.displayName, "Dov");
+    assert.equal(stored.description.en, "Hi", "other fields are kept");
+    assert.equal(bucket.json(keys.profile("sarah")).displayName, "sarah", "other authors untouched");
+    assert.equal((await (await call("GET", "/api/public/dovene/profile")).json()).displayName, "Dov");
+  });
+
+  test("the name must be 1 to 80 characters, and editing needs a session and same origin", async () => {
+    const { call } = setup();
+    assert.equal((await call("PUT", "/api/admin/profile", { owner: "dovene", body: { displayName: "   " } })).status, 422);
+    assert.equal((await call("PUT", "/api/admin/profile", { owner: "dovene", body: { displayName: "x".repeat(81) } })).status, 422);
+    assert.equal((await call("GET", "/api/admin/profile")).status, 401);
+    assert.equal((await call("PUT", "/api/admin/profile", { owner: "dovene", body: { displayName: "Dov" }, headers: { Origin: "https://evil.test" } })).status, 403);
+  });
+});

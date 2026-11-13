@@ -7,6 +7,7 @@ window.TM.locales.fr = {
   "nav.language": "Langue",
 
   "hero.eyebrow": "Un carnet de voyage personnel",
+  "hero.eyebrowBy": "Un carnet de voyage personnel, par {name}",
   "hero.title": "Lieux, instants <em>&amp; souvenirs.</em>",
   "hero.cta": "Explorer les destinations",
   "hero.stat.places": "Destinations",

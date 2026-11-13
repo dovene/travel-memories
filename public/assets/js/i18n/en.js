@@ -7,6 +7,7 @@ window.TM.locales.en = {
   "nav.language": "Language",
 
   "hero.eyebrow": "A personal travel journal",
+  "hero.eyebrowBy": "A personal travel journal by {name}",
   "hero.title": "Places, moments <em>&amp; memories.</em>",
   "hero.cta": "Explore destinations",
   "hero.stat.places": "Destinations",
