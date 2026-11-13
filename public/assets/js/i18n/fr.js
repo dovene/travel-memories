@@ -98,6 +98,8 @@ window.TM.locales.fr = {
   "slideshow.endTitle": "C'était {name}",
   "slideshow.replay": "Revoir",
   "slideshow.next": "Suivant : {name}",
+  "slideshow.upNext": "Démarre dans {n} s",
+  "slideshow.stay": "Rester ici",
 
   "card.soon": "Photos bientôt",
   "place.noMediaTitle": "Photos bientôt disponibles",

@@ -852,6 +852,46 @@ body.lb-locked {
   gap: var(--space-3);
 }
 
+/* "Up next" countdown: the Next button fills up from left to right, the line below counts down. */
+.ss-next {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.ss-next-fill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--ocean-100);
+  transform-origin: left center;
+  transform: scaleX(var(--upnext, 0));
+}
+
+.ss-next:not(.is-counting) .ss-next-fill {
+  display: none;
+}
+
+.ss-upnext {
+  font-size: var(--fs-sm);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.ss-upnext[hidden] {
+  display: none;
+}
+
+.ss-stay {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--white);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
 .slideshow.is-ended .ss-actions .ss-pause {
   visibility: hidden;
 }

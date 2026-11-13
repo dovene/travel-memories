@@ -98,6 +98,8 @@ window.TM.locales.en = {
   "slideshow.endTitle": "That was {name}",
   "slideshow.replay": "Replay",
   "slideshow.next": "Next: {name}",
+  "slideshow.upNext": "Starts in {n} s",
+  "slideshow.stay": "Stay here",
 
   "card.soon": "Photos coming soon",
   "place.noMediaTitle": "Photos coming soon",

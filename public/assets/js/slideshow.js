@@ -6,7 +6,9 @@
  *  - Progress bars on top; tap the right side for next, left side for previous;
  *    press and hold to pause; swipe down to close.
  *  - Keyboard: Space pauses, arrows skip, M toggles sound, Esc closes.
- *  - At the end: Replay, or go on to the next destination of the journey.
+ *  - At the end: Replay, or go on to the next destination of the journey. When there is one,
+ *    it starts by itself after a short countdown ("Next destination in 8 s"), unless the
+ *    visitor chooses "Stay here", replays, or closes.
  */
 (function () {
   "use strict";
@@ -18,8 +20,10 @@
 
   var PHOTO_MS = 5000;
   var HOLD_MS = 220;
+  var UP_NEXT_MS = 8000; // countdown on the end screen before the next destination plays
 
-  var root, bars, stage, titleEl, counterEl, pauseBtn, muteBtn, closeBtn, endPanel, endTitle, replayBtn, nextBtn;
+  var root, bars, stage, titleEl, counterEl, pauseBtn, muteBtn, closeBtn, endPanel, endTitle, replayBtn, nextBtn, upNextEl, upNextText, stayBtn;
+  var upNext = -1; // milliseconds left before the next destination plays; -1 when no countdown runs
   var place = null;
   var next = null; // { place, go } — the following destination, when there is one
   var items = [];
@@ -56,8 +60,10 @@
       '<p class="ss-end-title"></p>' +
       '<div class="ss-end-actions">' +
       '<button type="button" class="btn btn-glass ss-replay">' + TM.icons.replay + "<span></span></button>" +
-      '<button type="button" class="btn btn-light ss-next"><span></span>' + TM.icons.arrowRight + "</button>" +
-      "</div></div>";
+      '<button type="button" class="btn btn-light ss-next"><span class="ss-next-fill" aria-hidden="true"></span><span class="ss-next-label"></span>' + TM.icons.arrowRight + "</button>" +
+      "</div>" +
+      '<p class="ss-upnext" hidden><span class="ss-upnext-text" aria-live="polite"></span> · <button type="button" class="ss-stay"></button></p>' +
+      "</div>";
     document.body.appendChild(root);
 
     bars = root.querySelector(".ss-bars");
@@ -71,6 +77,13 @@
     endTitle = root.querySelector(".ss-end-title");
     replayBtn = root.querySelector(".ss-replay");
     nextBtn = root.querySelector(".ss-next");
+    upNextEl = root.querySelector(".ss-upnext");
+    upNextText = root.querySelector(".ss-upnext-text");
+    stayBtn = root.querySelector(".ss-stay");
+    stayBtn.addEventListener("click", function () {
+      stopUpNext();
+      nextBtn.focus({ preventScroll: true });
+    });
 
     pauseBtn.addEventListener("click", function () {
       setPaused(!paused);
@@ -84,11 +97,7 @@
       show(0);
       pauseBtn.focus({ preventScroll: true });
     });
-    nextBtn.addEventListener("click", function () {
-      var n = next;
-      close();
-      if (n) n.go();
-    });
+    nextBtn.addEventListener("click", goNext);
     document.addEventListener("keydown", onKey);
     document.addEventListener("visibilitychange", function () {
       if (document.hidden && isOpen() && !ended) setPaused(true);
@@ -115,7 +124,9 @@
     endTitle.textContent = t("slideshow.endTitle", { name: TM.i18n.pick(place.name) });
     replayBtn.querySelector("span").textContent = t("slideshow.replay");
     nextBtn.hidden = !next;
-    if (next) nextBtn.querySelector("span").textContent = t("slideshow.next", { name: TM.i18n.pick(next.place.name) });
+    if (next) nextBtn.querySelector(".ss-next-label").textContent = t("slideshow.next", { name: TM.i18n.pick(next.place.name) });
+    stayBtn.textContent = t("slideshow.stay");
+    renderUpNext();
     if (items[index]) counterEl.textContent = t("viewer.counter", { i: index + 1, n: items.length });
   }
 
@@ -218,6 +229,7 @@
     var previous = slides[index];
     if (previous && previous.video && i !== index) previous.video.pause();
     ended = false;
+    upNext = -1;
     endPanel.hidden = true;
     root.classList.remove("is-ended");
     index = i;
@@ -247,8 +259,31 @@
     for (var k = 0; k < items.length; k++) fill(k, 1);
     endPanel.hidden = false;
     root.classList.add("is-ended");
+    if (next) upNext = UP_NEXT_MS;
     labels();
-    replayBtn.focus({ preventScroll: true });
+    (next ? nextBtn : replayBtn).focus({ preventScroll: true });
+  }
+
+  /* ---------- "up next" countdown on the end screen ---------- */
+
+  function goNext() {
+    var n = next;
+    close();
+    if (n) n.go();
+  }
+
+  function stopUpNext() {
+    upNext = -1;
+    renderUpNext();
+  }
+
+  function renderUpNext() {
+    var on = upNext >= 0 && ended && !!next;
+    upNextEl.hidden = !on;
+    nextBtn.classList.toggle("is-counting", on);
+    nextBtn.style.setProperty("--upnext", on ? String(1 - upNext / UP_NEXT_MS) : "0");
+    var text = on ? t("slideshow.upNext", { n: Math.max(1, Math.ceil(upNext / 1000)) }) : "";
+    if (upNextText.textContent !== text) upNextText.textContent = text; // only once a second, for screen readers
   }
 
   /* ---------- playback ---------- */
@@ -301,7 +336,13 @@
     raf = requestAnimationFrame(frame);
     var dt = lastFrame ? Math.min(now - lastFrame, 100) : 0;
     lastFrame = now;
-    if (ended) return;
+    if (ended) {
+      if (upNext < 0) return;
+      upNext -= dt;
+      if (upNext <= 0) return goNext();
+      renderUpNext();
+      return;
+    }
     var s = slides[index];
     if (!s) return;
     if (s.video) {
@@ -434,6 +475,7 @@
   function close() {
     if (!isOpen()) return;
     cancelAnimationFrame(raf);
+    upNext = -1;
     slides.forEach(function (s, k) {
       discard(k);
     });
