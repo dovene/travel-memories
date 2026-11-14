@@ -9,7 +9,7 @@ window.TM.locales.fr = {
   "hero.eyebrow": "Un carnet de voyage personnel",
   "hero.eyebrowBy": "Un carnet de voyage personnel, par {name}",
   "hero.title": "Lieux, instants <em>&amp; souvenirs.</em>",
-  "hero.cta": "Explorer les destinations",
+  "hero.cta": "Explorer mes destinations",
   "hero.stat.places": "Destinations",
   "hero.stat.countries": "Pays",
   "hero.stat.moments": "Instants",

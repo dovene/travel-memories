@@ -9,7 +9,7 @@ window.TM.locales.en = {
   "hero.eyebrow": "A personal travel journal",
   "hero.eyebrowBy": "A personal travel journal by {name}",
   "hero.title": "Places, moments <em>&amp; memories.</em>",
-  "hero.cta": "Explore destinations",
+  "hero.cta": "Explore my destinations",
   "hero.stat.places": "Destinations",
   "hero.stat.countries": "Countries",
   "hero.stat.moments": "Moments",
